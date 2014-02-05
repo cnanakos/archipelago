@@ -268,6 +268,7 @@ int close_map(struct peer_req *pr, struct map *map)
 		return -1;
 	else
 		map->state &= ~MF_MAP_EXCLUSIVE;
+		map->state &= ~MF_MAP_CANCACHE;
 	return 0;
 }
 
@@ -329,6 +330,7 @@ int open_map(struct peer_req *pr, struct map *map, uint32_t flags)
 		return -1;
 	else {
 		map->state |= MF_MAP_EXCLUSIVE;
+		map->state |= MF_MAP_CANCACHE;
 		map->opened_count = mio->count;
 	}
 	return 0;

@@ -265,7 +265,7 @@ int read_map_metadata_v0(struct map *map, unsigned char *metadata,
 	map->size = 0;
 	map->blocksize = MAPPER_DEFAULT_BLOCKSIZE;
 	map->nr_objs = 0;
-	map->flags = MF_MAP_READONLY;
+	//map->flags = MF_MAP_READONLY;
 	map->epoch = 0;
 	map->objects = NULL;
 

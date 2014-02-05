@@ -47,6 +47,7 @@
 #define MF_EXCLUSIVE 	(1 << 1)
 #define MF_FORCE 	(1 << 2)
 #define MF_ARCHIP	(1 << 3)
+#define MF_CACHE	(1 << 4)
 
 #define MAPPER_DEFAULT_BLOCKSIZE (1<<22)
 
@@ -139,6 +140,7 @@ struct map_node {
 				MF_MAP_DROPPING_CACHE|MF_MAP_OPENING|	       \
 				MF_MAP_SNAPSHOTTING|MF_MAP_SERIALIZING|        \
 				MF_MAP_HASHING)
+#define MF_MAP_CANCACHE		(1 << 12)
 
 struct map {
 	uint32_t version;

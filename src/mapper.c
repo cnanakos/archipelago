@@ -285,6 +285,7 @@ static struct map * create_map(char *name, uint32_t namelen, uint32_t flags)
 		return NULL;
 	}
 	m->size = -1;
+	m->state = 0;
 	if (flags & MF_ARCHIP){
 		strncpy(m->volume, MAPPER_PREFIX, MAPPER_PREFIX_LEN);
 		strncpy(m->volume + MAPPER_PREFIX_LEN, name, namelen);
@@ -303,9 +304,10 @@ static struct map * create_map(char *name, uint32_t namelen, uint32_t flags)
 		m->volumelen = namelen;
 		m->version = 0; /* version 0 should be pithos maps */
 		m->flags = MF_MAP_READONLY;
+		if (flags & MF_CACHE)
+			m->state |= MF_MAP_CANCACHE;
 	}
 	m->epoch = 0;
-	m->state = 0;
 	m->nr_objs = 0;
 	m->objects = NULL;
 	m->ref = 1;
@@ -597,7 +599,7 @@ static int dropcache(struct peer_req *pr, struct map *map)
 
 static int do_close(struct peer_req *pr, struct map *map)
 {
-	if (!(map->state & MF_MAP_EXCLUSIVE)) {
+	if (map->version > 0 && !(map->state & MF_MAP_EXCLUSIVE)) {
 		XSEGLOG2(&lc, E, "Attempted to close a not opened map");
 		return -1;
 	}
@@ -606,8 +608,12 @@ static int do_close(struct peer_req *pr, struct map *map)
 	 * map nodes.
 	 */
 	wait_all_map_objects_ready(map);
-	if (close_map(pr, map) < 0) {
-		return -1;
+	if (map->version > 0) {
+		if (close_map(pr, map) < 0) {
+			return -1;
+		}
+	} else {
+		map->state &= ~MF_MAP_CANCACHE;
 	}
 
 	return 0;
@@ -1189,8 +1195,8 @@ start:
 		goto start;
 	}
 	int r = action(pr, map);
-	//always drop cache if map not read exclusively
-	if (!(map->state & MF_MAP_EXCLUSIVE))
+	//always drop cache if map cannot be cached
+	if (!(map->state & MF_MAP_CANCACHE))
 		dropcache(pr, map);
 	signal_map(map);
 	put_map(map);
@@ -1201,8 +1207,13 @@ void * handle_info(struct peer_req *pr)
 {
 	struct peerd *peer = pr->peer;
 	char *target = xseg_get_target(peer->xseg, pr->req);
-	int r = map_action(do_info, pr, target, pr->req->targetlen,
-				MF_ARCHIP|MF_LOAD);
+	uint32_t flags;
+	if (pr->req->flags & XF_CONTADDR) {
+		flags = MF_CACHE|MF_LOAD;
+	} else {
+		flags = MF_ARCHIP|MF_LOAD;
+	}
+	int r = map_action(do_info, pr, target, pr->req->targetlen, flags);
 	if (r < 0)
 		fail(peer, pr);
 	else
@@ -1217,6 +1228,7 @@ void * handle_clone(struct peer_req *pr)
 	struct peerd *peer = pr->peer;
 	//struct mapperd *mapper = __get_mapperd(peer);
 	struct xseg_request_clone *xclone;
+	uint32_t flags;
 	xclone = (struct xseg_request_clone *) xseg_get_data(peer->xseg, pr->req);
 	if (!xclone) {
 		r = -1;
@@ -1225,12 +1237,12 @@ void * handle_clone(struct peer_req *pr)
 
 	if (xclone->targetlen){
 		/* if snap was defined */
-		if (pr->req->flags & XF_CONTADDR)
-			r = map_action(do_clone, pr, xclone->target,
-					xclone->targetlen, MF_LOAD);
-		else
-			r = map_action(do_clone, pr, xclone->target,
-					xclone->targetlen, MF_LOAD|MF_ARCHIP);
+		if (pr->req->flags & XF_CONTADDR) {
+			flags = MF_LOAD;
+		} else {
+			flags = MF_LOAD|MF_ARCHIP;
+		}
+		r = map_action(do_clone, pr, xclone->target, xclone->targetlen, flags);
 	} else {
 		/* else try to create a new volume */
 		XSEGLOG2(&lc, I, "Creating volume");
@@ -1328,8 +1340,14 @@ void * handle_mapr(struct peer_req *pr)
 {
 	struct peerd *peer = pr->peer;
 	char *target = xseg_get_target(peer->xseg, pr->req);
-	int r = map_action(do_mapr, pr, target, pr->req->targetlen,
-				MF_ARCHIP|MF_LOAD|MF_EXCLUSIVE);
+	uint32_t flags;
+	int r;
+	if (pr->req->flags & XF_CONTADDR) {
+		flags = MF_CACHE|MF_LOAD;
+	} else {
+		flags = MF_ARCHIP|MF_LOAD|MF_EXCLUSIVE;
+	}
+	r = map_action(do_mapr, pr, target, pr->req->targetlen, flags);
 	if (r < 0)
 		fail(peer, pr);
 	else
@@ -1342,8 +1360,17 @@ void * handle_mapw(struct peer_req *pr)
 {
 	struct peerd *peer = pr->peer;
 	char *target = xseg_get_target(peer->xseg, pr->req);
-	int r = map_action(do_mapw, pr, target, pr->req->targetlen,
-				MF_ARCHIP|MF_LOAD|MF_EXCLUSIVE|MF_FORCE);
+	int r;
+	uint32_t flags;
+	if (pr->req->flags & XF_CONTADDR) {
+		r = -1;
+		goto out;
+	} else {
+		flags = MF_ARCHIP|MF_LOAD|MF_EXCLUSIVE|MF_FORCE;
+	}
+
+	r = map_action(do_mapw, pr, target, pr->req->targetlen, flags);
+out:
 	if (r < 0)
 		fail(peer, pr);
 	else
@@ -1357,11 +1384,19 @@ void * handle_destroy(struct peer_req *pr)
 {
 	struct peerd *peer = pr->peer;
 	char *target = xseg_get_target(peer->xseg, pr->req);
-	/* request EXCLUSIVE access, but do not force it.
-	 * check if succeeded on do_destroy
-	 */
-	int r = map_action(do_destroy, pr, target, pr->req->targetlen,
-				MF_ARCHIP|MF_LOAD|MF_EXCLUSIVE);
+	uint32_t flags;
+	int r;
+	if (pr->req->flags & XF_CONTADDR) {
+		r = -1;
+		goto out;
+	} else {
+		/* request EXCLUSIVE access, but do not force it.
+		 * check if succeeded on do_destroy
+		 */
+		flags = MF_ARCHIP|MF_LOAD|MF_EXCLUSIVE;
+	}
+	r = map_action(do_destroy, pr, target, pr->req->targetlen, flags);
+out:
 	if (r < 0)
 		fail(peer, pr);
 	else
@@ -1375,8 +1410,14 @@ void * handle_open(struct peer_req *pr)
 	struct peerd *peer = pr->peer;
 	char *target = xseg_get_target(peer->xseg, pr->req);
 	//here we do not want to load
-	int r = map_action(do_open, pr, target, pr->req->targetlen,
-				MF_ARCHIP|MF_LOAD|MF_EXCLUSIVE);
+	uint32_t flags;
+	int r;
+	if (pr->req->flags & XF_CONTADDR) {
+		flags = MF_CACHE|MF_LOAD;
+	} else {
+		flags = MF_ARCHIP|MF_LOAD|MF_EXCLUSIVE;
+	}
+	r = map_action(do_open, pr, target, pr->req->targetlen, flags);
 	if (r < 0)
 		fail(peer, pr);
 	else
@@ -1389,9 +1430,15 @@ void * handle_close(struct peer_req *pr)
 {
 	struct peerd *peer = pr->peer;
 	char *target = xseg_get_target(peer->xseg, pr->req);
-	//here we do not want to load
-	int r = map_action(do_close, pr, target, pr->req->targetlen,
-				MF_ARCHIP|MF_EXCLUSIVE|MF_FORCE);
+	uint32_t flags;
+	int r;
+	if (pr->req->flags & XF_CONTADDR) {
+		//here we do not want to load
+		flags = 0;
+	} else {
+		flags = MF_ARCHIP|MF_EXCLUSIVE|MF_FORCE;
+	}
+	r = map_action(do_close, pr, target, pr->req->targetlen, flags);
 	if (r < 0)
 		fail(peer, pr);
 	else
@@ -1404,11 +1451,20 @@ void * handle_snapshot(struct peer_req *pr)
 {
 	struct peerd *peer = pr->peer;
 	char *target = xseg_get_target(peer->xseg, pr->req);
-	/* request EXCLUSIVE access, but do not force it.
-	 * check if succeeded on do_snapshot
-	 */
-	int r = map_action(do_snapshot, pr, target, pr->req->targetlen,
-				MF_ARCHIP|MF_LOAD|MF_EXCLUSIVE);
+	uint32_t flags;
+	int r;
+	if (pr->req->flags & XF_CONTADDR) {
+		r = -1;
+		goto out;
+	} else {
+		/* request EXCLUSIVE access, but do not force it.
+		 * check if succeeded on do_snapshot
+		 */
+		flags = MF_ARCHIP|MF_LOAD|MF_EXCLUSIVE;
+	}
+
+	r = map_action(do_snapshot, pr, target, pr->req->targetlen, flags);
+out:
 	if (r < 0)
 		fail(peer, pr);
 	else
@@ -1421,11 +1477,20 @@ void * handle_hash(struct peer_req *pr)
 {
 	struct peerd *peer = pr->peer;
 	char *target = xseg_get_target(peer->xseg, pr->req);
-	/* Do not request exclusive access. Since we are hashing only shapshots
-	 * which are read only, there is no need for locking
-	 */
-	int r = map_action(do_hash, pr, target, pr->req->targetlen,
-				MF_ARCHIP|MF_LOAD);
+	uint32_t flags;
+	int r;
+	if (pr->req->flags & XF_CONTADDR) {
+		r = -1;
+		goto out;
+	} else {
+		/* Do not request exclusive access. Since we are hashing only shapshots
+		 * which are read only, there is no need for locking
+		 */
+		flags = MF_ARCHIP|MF_LOAD;
+	}
+
+	r = map_action(do_hash, pr, target, pr->req->targetlen, flags);
+out:
 	if (r < 0)
 		fail(peer, pr);
 	else
