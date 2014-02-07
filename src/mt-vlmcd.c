@@ -315,7 +315,7 @@ static int do_accepted_pr(struct peerd *peer, struct peer_req *pr)
 	vio->err = 0; //reset error state
 
 	if (pr->req->op == X_WRITE && !pr->req->size &&
-			(pr->req->flags & (XF_FLUSH|XF_FUA))){
+			(pr->req->flags & XF_FLUSH)){
 		//hanlde flush requests here, so we don't mess with mapper
 		//because of the -1 offset
 		vi->flags &= ~VF_VOLUME_FREEZED;
@@ -351,6 +351,10 @@ static int do_accepted_pr(struct peerd *peer, struct peer_req *pr)
 	vio->mreq->size = pr->req->size;
 	vio->mreq->offset = pr->req->offset;
 	vio->mreq->flags = 0;
+	if (pr->req->flags & XF_CONTADDR) {
+		vio->mreq->flags |= XF_CONTADDR;
+	}
+
 	switch (pr->req->op) {
 		case X_READ: vio->mreq->op = X_MAPR; break;
 		case X_WRITE: vio->mreq->op = X_MAPW; break;
