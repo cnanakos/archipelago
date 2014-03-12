@@ -8,6 +8,12 @@ SEGMENT_DYNPORTS = 1024
 VTOOL_START=1003
 VTOOL_END=1022
 
+[ARCHIPELAGO]
+# Switch peer processes to run as this user
+USER=root
+# Switch peer processes to run as this group
+GROUP=root
+
 # (peer role, peer type)
 # Mandatory peer roles:
 # 	blockerb
