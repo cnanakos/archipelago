@@ -129,6 +129,7 @@ def xseg_wait_signal_green(ctx, sd, timeout):
             else:
                 raise OSError(e, msg)
 
+
 def is_file_writable(name, uid, gid):
     s = os.stat(name)
     mode = s[stat.ST_MODE]
@@ -254,7 +255,6 @@ class Peer(object):
         if self.log_level < 0 or self.log_level > 3:
             raise Error("%s: Invalid log level %d" %
                         (self.role, self.log_level))
-
 
         if self.cli_opts is None:
             self.cli_opts = []
@@ -553,8 +553,8 @@ class Segment(object):
 
     def get_spec(self):
         if not self.spec:
-            params = [self.type, self.name, str(self.dynports), str(self.ports),
-                      str(self.size), str(self.alignment)]
+            params = [self.type, self.name, str(self.dynports),
+                      str(self.ports), str(self.size), str(self.alignment)]
             self.spec = ':'.join(params).encode()
         return self.spec
 
@@ -590,6 +590,7 @@ class Segment(object):
 
         return ctx
 
+
 def check_conf():
     port_ranges = []
 
@@ -615,8 +616,9 @@ def check_conf():
                         (portno_start, portno_end))
         for start, end in port_ranges:
             if not (portno_end < start or portno_start > end):
-                raise Error("Port range conflict: (%d, %d) confilcts with (%d, %d)" %
-                            (portno_start, portno_end,  start, end))
+                raise Error(
+                    "Port range conflict: (%d, %d) conflicts with (%d, %d)" %
+                    (portno_start, portno_end,  start, end))
         port_ranges.append((portno_start, portno_end))
 
         port_ranges.append((portno_start, portno_end))
@@ -629,9 +631,8 @@ def check_conf():
     xseg_align = config['SEGMENT_ALIGNMENT']
 
     global segment
-    segment = Segment(xseg_type, xseg_name, xseg_dynports, xseg_ports, xseg_size,
-                      xseg_align)
-
+    segment = Segment(xseg_type, xseg_name, xseg_dynports, xseg_ports,
+                      xseg_size, xseg_align)
 
     try:
         if not config['roles']:
@@ -661,10 +662,10 @@ def check_conf():
 
         if role_type == 'file_blocker':
             peers[role] = Filed(role=role, spec=segment.get_spec(),
-                                 prefix=ARCHIP_PREFIX, **role_config)
+                                prefix=ARCHIP_PREFIX, **role_config)
         elif role_type == 'rados_blocker':
             peers[role] = Radosd(role=role, spec=segment.get_spec(),
-                               **role_config)
+                                 **role_config)
         elif role_type == 'mapperd':
             peers[role] = Mapperd(role=role, spec=segment.get_spec(),
                                   **role_config)
@@ -680,13 +681,18 @@ def check_conf():
 
     return True
 
+
 def get_segment():
     return segment
+
 
 def construct_peers():
     return peers
 
+
 vtool_port = None
+
+
 def get_vtool_port():
     global vtool_port
     if vtool_port is None:
@@ -694,6 +700,7 @@ def get_vtool_port():
     return vtool_port
 
 acquired_locks = {}
+
 
 def get_lock(lock_file):
     while True:
@@ -707,6 +714,7 @@ def get_lock(lock_file):
             else:
                 raise OSError(err, lock_file + ' ' + reason)
     return fd
+
 
 def exclusive(get_port=False):
     def wrap(fn):
@@ -722,7 +730,8 @@ def exclusive(get_port=False):
 
             if get_port:
                 vtool_port = get_vtool_port()
-                lock_file = os.path.join(LOCK_PATH, VLMC_LOCK_FILE + '_' + str(vtool_port))
+                lock_file = os.path.join(
+                    LOCK_PATH, VLMC_LOCK_FILE + '_' + str(vtool_port))
             else:
                 lock_file = os.path.join(LOCK_PATH, VLMC_LOCK_FILE)
             try:
@@ -746,6 +755,7 @@ def exclusive(get_port=False):
 
         return lock
     return wrap
+
 
 def createDict(cfg, section):
     sec_dic = {}
@@ -797,13 +807,13 @@ def loadrc(rc):
 
     cfg = ConfigParser.ConfigParser()
     cfg.readfp(cfg_fd)
-    config['SEGMENT_PORTS'] = cfg.getint('XSEG','SEGMENT_PORTS')
+    config['SEGMENT_PORTS'] = cfg.getint('XSEG', 'SEGMENT_PORTS')
     config['SEGMENT_DYNPORTS'] = cfg.getint('XSEG', 'SEGMENT_DYNPORTS')
-    config['SEGMENT_SIZE'] = cfg.getint('XSEG','SEGMENT_SIZE')
+    config['SEGMENT_SIZE'] = cfg.getint('XSEG', 'SEGMENT_SIZE')
     config['USER'] = cfg.get('ARCHIPELAGO', 'USER')
     config['GROUP'] = cfg.get('ARCHIPELAGO', 'GROUP')
-    config['VTOOL_START'] = cfg.getint('XSEG','VTOOL_START')
-    config['VTOOL_END'] = cfg.getint('XSEG','VTOOL_END')
+    config['VTOOL_START'] = cfg.getint('XSEG', 'VTOOL_START')
+    config['VTOOL_END'] = cfg.getint('XSEG', 'VTOOL_END')
     roles = cfg.get('PEERS', 'ROLES')
     roles = str(roles)
     roles = roles.split(' ')
@@ -834,6 +844,7 @@ def load_module(name, args):
         sys.stdout.write("\n")
         return
     cmd = ["modprobe", "%s" % name]
+
 
 def load_module(name, args):
     s = "Loading %s " % name
@@ -916,6 +927,7 @@ def check_pidfile(name):
 
     return pid
 
+
 class Xseg_ctx(object):
     ctx = None
     port = None
@@ -927,7 +939,7 @@ class Xseg_ctx(object):
         ctx = segment.join()
         if not ctx:
             raise Error("Cannot join segment")
-        if portno == None:
+        if portno is None:
             port = xseg_bind_dynport(ctx)
             portno = xseg_portno_nonstatic(ctx, port)
             dynalloc = True
@@ -985,7 +997,7 @@ class Xseg_ctx(object):
             for req in requests:
                 xseg_req = req.req
                 if addressof(received.contents) == \
-                            addressof(xseg_req.contents):
+                        addressof(xseg_req.contents):
                     return req
             p = xseg_respond(self.ctx, received, self.portno, X_ALLOC)
             if p == NoPort:
@@ -998,8 +1010,8 @@ class Request(object):
     xseg_ctx = None
     req = None
 
-    def __init__(self, xseg_ctx, dst_portno, target, datalen=0, size=0, op=None,
-                 data=None, flags=0, offset=0):
+    def __init__(self, xseg_ctx, dst_portno, target, datalen=0, size=0,
+                 op=None, data=None, flags=0, offset=0):
         if not target:
             raise Error("No target")
         targetlen = len(target)
@@ -1050,7 +1062,7 @@ class Request(object):
 
     def put(self, force=False):
         if not self.req:
-            return False;
+            return False
         if not force:
             if xq_count(byref(self.req.contents.path)) > 0:
                 return False
@@ -1152,15 +1164,17 @@ class Request(object):
         self.xseg_ctx.wait_requests([self])
 
     def success(self):
-        if not bool(self.req.contents.state & XS_SERVED) and not \
-            bool(self.req.contents.state & XS_FAILED):
+        if (
+            not bool(self.req.contents.state & XS_SERVED) and
+            not bool(self.req.contents.state & XS_FAILED)
+        ):
             raise Error("Request not completed, nor Failed")
-        return bool((self.req.contents.state & XS_SERVED) and not \
+        return bool((self.req.contents.state & XS_SERVED) and not
                    (self.req.contents.state & XS_FAILED))
 
     @classmethod
     def get_write_request(cls, xseg, dst, target, data=None, offset=0,
-            datalen=0, flags=0):
+                          datalen=0, flags=0):
         if data is None:
             data = ""
         size = len(data)
@@ -1173,11 +1187,29 @@ class Request(object):
     @classmethod
     def get_read_request(cls, xseg, dst, target, size=0, offset=0, datalen=0):
         if not datalen:
-            datalen=size
+            datalen = size
         return cls(xseg, dst, target, op=X_READ, offset=offset, size=size,
                    datalen=datalen)
 
     @classmethod
+    def get_info_request(cls, xseg, dst, target):
+        return cls(xseg, dst, target, op=X_INFO)
+
+    @classmethod
+    def get_copy_request(cls, xseg, dst, target, copy_target=None, size=0,
+                         offset=0):
+        datalen = sizeof(xseg_request_copy)
+        xcopy = xseg_request_copy()
+        xcopy.target = target
+        xcopy.targetlen = len(target)
+        return cls(xseg, dst, copy_target, op=X_COPY, data=xcopy,
+                   datalen=datalen, size=size, offset=offset)
+
+    @classmethod
+    def get_acquire_request(cls, xseg, dst, target, wait=False):
+        flags = 0
+        if not wait:
+            flags = XF_NOSYNC
         return cls(xseg, dst, target, op=X_ACQUIRE, flags=flags)
 
     @classmethod
@@ -1193,11 +1225,11 @@ class Request(object):
 
     @classmethod
     def get_clone_request(cls, xseg, dst, target, clone=None, clone_size=0,
-            cont_addr=False):
+                          cont_addr=False):
         datalen = sizeof(xseg_request_clone)
         xclone = xseg_request_clone()
         xclone.target = target
-        xclone.targetlen= len(target)
+        xclone.targetlen = len(target)
         xclone.size = clone_size
 
         flags = 0
@@ -1205,7 +1237,7 @@ class Request(object):
             flags = XF_CONTADDR
 
         return cls(xseg, dst, clone, op=X_CLONE, data=xclone, datalen=datalen,
-                flags=flags)
+                   flags=flags)
 
     @classmethod
     def get_open_request(cls, xseg, dst, target):
@@ -1220,20 +1252,20 @@ class Request(object):
         datalen = sizeof(xseg_request_snapshot)
         xsnapshot = xseg_request_snapshot()
         xsnapshot.target = snap
-        xsnapshot.targetlen= len(snap)
+        xsnapshot.targetlen = len(snap)
 
         return cls(xseg, dst, target, op=X_SNAPSHOT, data=xsnapshot,
-                datalen=datalen)
+                   datalen=datalen)
 
     @classmethod
     def get_mapr_request(cls, xseg, dst, target, offset=0, size=0):
         return cls(xseg, dst, target, op=X_MAPR, offset=offset, size=size,
-                datalen=0)
+                   datalen=0)
 
     @classmethod
     def get_mapw_request(cls, xseg, dst, target, offset=0, size=0):
         return cls(xseg, dst, target, op=X_MAPW, offset=offset, size=size,
-                datalen=0)
+                   datalen=0)
 
     @classmethod
     def get_hash_request(cls, xseg, dst, target, size=0, offset=0):

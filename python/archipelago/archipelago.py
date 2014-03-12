@@ -46,6 +46,7 @@ from .vlmc import showmapped as vlmc_showmapped
 from .vlmc import get_mapped as vlmc_get_mapped
 from blktap import VlmcTapdisk
 
+
 def start_peer(peer, cli=False):
     if peer.is_running():
         raise Error("Cannot start peer %s. Peer already running" % peer.role)
@@ -71,7 +72,7 @@ def start_peer(peer, cli=False):
     while not peer.is_running():
         time.sleep(0.1)
         i += 1
-        if i > 30: #3secs
+        if i > 30:  # 3secs
             if cli:
                 sys.stdout.write(red("FAILED".ljust(SECOND_COLUMN_WIDTH)))
                 sys.stdout.write("\n")

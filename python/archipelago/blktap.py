@@ -73,8 +73,8 @@ class VlmcTapdisk(object):
 
         def __str__(self):
             return 'volume=%s pid=%s minor=%s state=%s device=%s' \
-                    % (self.volume, self.pid, self.minor, self.state,
-                       self.device)
+                   % (self.volume, self.pid, self.minor, self.state,
+                      self.device)
 
     @staticmethod
     def exc(*args):
@@ -83,8 +83,8 @@ class VlmcTapdisk(object):
         stdout.close()
         stderr.close()
         if rc:
-            raise VlmcTapdiskException('%s failed (%s %s %s)' % \
-                                   (args, rc, out, err))
+            raise VlmcTapdiskException('%s failed (%s %s %s)' %
+                                       (args, rc, out, err))
         return out
 
     @staticmethod
@@ -114,7 +114,7 @@ class VlmcTapdisk(object):
                     tapdisk.minor = int(value)
                     if tapdisk.minor >= 0:
                         tapdisk.device = '%s%s' % \
-                                        (VlmcTapdisk.TAP_DEV, tapdisk.minor)
+                            (VlmcTapdisk.TAP_DEV, tapdisk.minor)
                 elif key == 'state':
                     tapdisk.state = value
                 elif key == 'args' and value.find(':') != -1:
