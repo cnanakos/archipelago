@@ -37,8 +37,22 @@
 
 from xseg.xseg_api import *
 from xseg.xprotocol import *
-from ctypes import CFUNCTYPE, cast, c_void_p, addressof, string_at, memmove, \
-    create_string_buffer, pointer, sizeof, POINTER, byref, c_int, c_char, Structure
+from ctypes import (
+    CFUNCTYPE,
+    cast,
+    c_void_p,
+    addressof,
+    string_at,
+    memmove,
+    create_string_buffer,
+    pointer,
+    sizeof,
+    POINTER,
+    byref,
+    c_int,
+    c_char,
+    Structure
+)
 import ctypes
 cb_null_ptrtype = CFUNCTYPE(None, uint32_t)
 
@@ -54,6 +68,9 @@ import socket
 import random
 from select import select
 import ConfigParser
+from grp import getgrnam
+from pwd import getpwnam
+import stat
 
 random.seed()
 hostname = socket.gethostname()
@@ -62,7 +79,6 @@ valid_role_types = ['file_blocker', 'rados_blocker', 'mapperd', 'vlmcd']
 valid_segment_types = ['posix']
 
 peers = dict()
-xsegbd_args = []
 segment = None
 
 BIN_DIR = '/usr/bin/'
@@ -85,8 +101,10 @@ RADOS_BLOCKER = 'archip-radosd'
 MAPPER = 'archip-mapperd'
 VLMC = 'archip-vlmcd'
 
+
 def is_power2(x):
     return bool(x != 0 and (x & (x-1)) == 0)
+
 
 #hack to test green waiting with python gevent.
 class posixfd_signal_desc(Structure):
@@ -97,6 +115,7 @@ posixfd_signal_desc._fields_ = [
     ('flag', c_int),
 ]
 
+
 def xseg_wait_signal_green(ctx, sd, timeout):
     posixfd_sd = cast(sd, POINTER(posixfd_signal_desc))
     fd = posixfd_sd.contents.fd
@@ -104,11 +123,20 @@ def xseg_wait_signal_green(ctx, sd, timeout):
     while True:
         try:
             os.read(fd, 512)
-        except OSError as (e,msg):
+        except OSError as (e, msg):
             if e == 11:
                 break
             else:
                 raise OSError(e, msg)
+
+def is_file_writable(name, uid, gid):
+    s = os.stat(name)
+    mode = s[stat.ST_MODE]
+    return (
+        ((s[stat.ST_UID] == uid) and (mode & stat.S_IWUSR)) or
+        ((s[stat.ST_GID] == gid) and (mode & stat.S_IWGRP)) or
+        (mode & stat.S_IWOTH)
+        )
 
 
 class Peer(object):
@@ -116,10 +144,24 @@ class Peer(object):
 
     def __init__(self, role=None, daemon=True, nr_ops=16,
                  logfile=None, pidfile=None, portno_start=None,
-                 portno_end=None, log_level=0, spec=None, threshold=None):
+                 portno_end=None, log_level=0, spec=None, threshold=None,
+                 user=None, group=None):
         if not role:
             raise Error("Role was not provided")
         self.role = role
+
+        if not user:
+            raise Error("User was not provided")
+
+        self.user = user
+
+        if not group:
+            raise Error("Group was not provided")
+
+        self.group = group
+
+        self.user_uid = getpwnam(self.user).pw_uid
+        self.group_gid = getgrnam(self.group).gr_gid
 
         self.nr_ops = nr_ops
         if not self.nr_ops > 0:
@@ -149,10 +191,42 @@ class Peer(object):
         else:
             self.logfile = os.path.join(LOGS_PATH, role + LOG_SUFFIX)
 
+        try:
+            if is_file_writable(LOGS_PATH, self.user_uid, self.group_gid):
+                pass
+            else:
+                raise Error("Cannot write to directory '%s'" % LOGS_PATH)
+        except OSError, er:
+            pass
+
+        try:
+            if is_file_writable(self.logfile, self.user_uid, self.group_gid):
+                pass
+            else:
+                raise Error("Cannot write to file '%s'" % self.logfile)
+        except OSError, er:
+            pass
+
         if pidfile:
             self.pidfile = pidfile
         else:
             self.pidfile = os.path.join(PIDFILE_PATH, role + PID_SUFFIX)
+
+        try:
+            if is_file_writable(PIDFILE_PATH, self.user_uid, self.group_gid):
+                pass
+            else:
+                raise Error("Cannot write to directory '%s'" % PIDFILE_PATH)
+        except OSError, er:
+            pass
+
+        try:
+            if is_file_writable(self.pidfile, self.user_uid, self.group_gid):
+                pass
+            else:
+                raise Error("Cannot write to file '%s'" % self.pidfile)
+        except OSError, er:
+            pass
 
         try:
             if not os.path.isdir(os.path.dirname(self.logfile)):
@@ -180,6 +254,7 @@ class Peer(object):
         if self.log_level < 0 or self.log_level > 3:
             raise Error("%s: Invalid log level %d" %
                         (self.role, self.log_level))
+
 
         if self.cli_opts is None:
             self.cli_opts = []
@@ -264,6 +339,12 @@ class Peer(object):
         if self.threshold:
             self.cli_opts.append("--threshold")
             self.cli_opts.append(str(self.threshold))
+        if self.user:
+            self.cli_opts.append("-uid")
+            self.cli_opts.append(str(self.user_uid))
+        if self.group:
+            self.cli_opts.append("-gid")
+            self.cli_opts.append(str(self.group_gid))
 
 
 class MTpeer(Peer):
@@ -298,7 +379,8 @@ class Radosd(MTpeer):
 
 class Filed(MTpeer):
     def __init__(self, archip_dir=None, prefix=None, fdcache=None,
-                 unique_str=None, nr_threads=1, nr_ops=16, direct=True, **kwargs):
+                 unique_str=None, nr_threads=1, nr_ops=16, direct=True,
+                 **kwargs):
         self.executable = FILE_BLOCKER
         self.archip_dir = archip_dir
         self.prefix = prefix
@@ -309,12 +391,17 @@ class Filed(MTpeer):
         if self.fdcache and fdcache < 2*nr_threads:
             raise Error("Fdcache should be greater than 2*nr_threads")
 
-        super(Filed, self).__init__(nr_threads=nr_threads, nr_ops=nr_ops, **kwargs)
+        super(Filed, self).__init__(nr_threads=nr_threads, nr_ops=nr_ops,
+                                    **kwargs)
 
         if not self.archip_dir:
             raise Error("%s: Archip dir must be set" % self.role)
         if not os.path.isdir(self.archip_dir):
             raise Error("%s: Archip dir invalid" % self.role)
+        if not is_file_writable(self.archip_dir, self.user_uid,
+                                self.group_gid):
+            raise Error("%s: Archip dir is not writable" % self.role)
+
         if not self.fdcache:
             self.fdcache = 2*self.nr_ops
         if not self.unique_str:
@@ -393,15 +480,13 @@ class Vlmcd(Peer):
 
 config = {
     'CEPH_CONF_FILE': '/etc/ceph/ceph.conf',
-#    'SPEC': "posix:archipelago:1024:5120:12",
+    # 'SPEC': "posix:archipelago:1024:5120:12",
     'SEGMENT_TYPE': 'posix',
     'SEGMENT_NAME': 'archipelago',
     'SEGMENT_DYNPORTS': 1024,
     'SEGMENT_PORTS': 2048,
     'SEGMENT_SIZE': 5120,
     'SEGMENT_ALIGNMENT': 12,
-    'XSEGBD_START': 0,
-    'XSEGBD_END': 499,
     'VTOOL_START': 1003,
     'VTOOL_END': 1003,
     #RESERVED 1023
@@ -437,6 +522,7 @@ class Error(Exception):
     def __str__(self):
         return self.msg
 
+
 class Segment(object):
     type = 'posix'
     name = 'archipelago'
@@ -460,7 +546,7 @@ class Segment(object):
             raise Error("Segment type not valid")
         if self.alignment != 12:
             raise Error("Wrong alignemt")
-        if self.dynports >= self.ports :
+        if self.dynports >= self.ports:
             raise Error("Dynports >= max ports")
 
         self.spec = self.get_spec()
@@ -533,6 +619,8 @@ def check_conf():
                             (portno_start, portno_end,  start, end))
         port_ranges.append((portno_start, portno_end))
 
+        port_ranges.append((portno_start, portno_end))
+
     xseg_type = config['SEGMENT_TYPE']
     xseg_name = config['SEGMENT_NAME']
     xseg_dynports = config['SEGMENT_DYNPORTS']
@@ -551,11 +639,23 @@ def check_conf():
     except KeyError:
         raise Error("Roles setup must be provided")
 
+    try:
+        getpwnam(config['USER'])
+    except KeyError:
+        raise Error("User '%s' does not exist." % config['USER'])
+
+    try:
+        getgrnam(config['GROUP'])
+    except KeyError:
+        raise Error("Group '%s' does not exist." % config['GROUP'])
+
     for role, role_type in config['roles']:
         if role_type not in valid_role_types:
             raise Error("%s is not a valid role" % role_type)
         try:
             role_config = config[role]
+            role_config['user'] = config['USER']
+            role_config['group'] = config['GROUP']
         except:
             raise Error("No config found for %s" % role)
 
@@ -577,13 +677,7 @@ def check_conf():
                           xseg_ports)
 
     validatePortRange(config['VTOOL_START'], config['VTOOL_END'], xseg_ports)
-    validatePortRange(config['XSEGBD_START'], config['XSEGBD_END'],
-                      xseg_ports)
 
-    xsegbd_range = config['XSEGBD_END'] - config['XSEGBD_START']
-    vlmcd_range = peers['vlmcd'].portno_end - peers['vlmcd'].portno_start
-    if xsegbd_range > vlmcd_range:
-        raise Error("Xsegbd port range must be smaller that vlmcd port range")
     return True
 
 def get_segment():
@@ -706,8 +800,8 @@ def loadrc(rc):
     config['SEGMENT_PORTS'] = cfg.getint('XSEG','SEGMENT_PORTS')
     config['SEGMENT_DYNPORTS'] = cfg.getint('XSEG', 'SEGMENT_DYNPORTS')
     config['SEGMENT_SIZE'] = cfg.getint('XSEG','SEGMENT_SIZE')
-    config['XSEGBD_START'] = cfg.getint('XSEG','XSEGBD_START')
-    config['XSEGBD_END'] = cfg.getint('XSEG','XSEGBD_END')
+    config['USER'] = cfg.get('ARCHIPELAGO', 'USER')
+    config['GROUP'] = cfg.get('ARCHIPELAGO', 'GROUP')
     config['VTOOL_START'] = cfg.getint('XSEG','VTOOL_START')
     config['VTOOL_END'] = cfg.getint('XSEG','VTOOL_END')
     roles = cfg.get('PEERS', 'ROLES')
@@ -734,6 +828,22 @@ def loaded_module(name):
 def load_module(name, args):
     s = "Loading %s " % name
     sys.stdout.write(s.ljust(FIRST_COLUMN_WIDTH))
+    modules = loaded_modules()
+    if name in modules:
+        sys.stdout.write(yellow("Already loaded".ljust(SECOND_COLUMN_WIDTH)))
+        sys.stdout.write("\n")
+        return
+    cmd = ["modprobe", "%s" % name]
+
+def load_module(name, args):
+    s = "Loading %s " % name
+    sys.stdout.write(s.ljust(FIRST_COLUMN_WIDTH))
+    modules = loaded_modules()
+    if name in modules:
+        sys.stdout.write(yellow("Already loaded".ljust(SECOND_COLUMN_WIDTH)))
+        sys.stdout.write("\n")
+        return
+    cmd = ["modprobe", "%s" % name]
     modules = loaded_modules()
     if name in modules:
         sys.stdout.write(yellow("Already loaded".ljust(SECOND_COLUMN_WIDTH)))
@@ -1068,22 +1178,6 @@ class Request(object):
                    datalen=datalen)
 
     @classmethod
-    def get_info_request(cls, xseg, dst, target):
-        return cls(xseg, dst, target, op=X_INFO)
-
-    @classmethod
-    def get_copy_request(cls, xseg, dst, target, copy_target=None, size=0, offset=0):
-        datalen = sizeof(xseg_request_copy)
-        xcopy = xseg_request_copy()
-        xcopy.target = target
-        xcopy.targetlen = len(target)
-        return cls(xseg, dst, copy_target, op=X_COPY, data=xcopy, datalen=datalen,
-                size=size, offset=offset)
-    @classmethod
-    def get_acquire_request(cls, xseg, dst, target, wait=False):
-        flags = 0
-        if not wait:
-            flags = XF_NOSYNC
         return cls(xseg, dst, target, op=X_ACQUIRE, flags=flags)
 
     @classmethod
