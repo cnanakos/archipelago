@@ -45,6 +45,8 @@ from copy import copy
 from sets import Set
 from binascii import hexlify, unhexlify
 from hashlib import sha256
+import pwd
+import grp
 
 def get_random_string(length=64, repeat=16):
     nr_repeats = length//repeat
@@ -82,7 +84,7 @@ def merkle_hash(hashes):
     while len(hashes) > 1 :
         hashes = [sha256(hashes[i] + hashes[i + 1]).digest() for i in range (0, len(hashes), 2)]
     return hashes[0]
-    
+
 
 def init():
     rnd.seed()
@@ -109,7 +111,8 @@ class XsegTest(unittest.TestCase):
             self.segment.destroy()
             self.segment.create()
         self.xseg = Xseg_ctx(self.segment)
-
+        self.user = pwd.getpwuid(os.geteuid()).pw_name
+        self.group = grp.getgrgid(os.getegid()).gr_name
     def tearDown(self):
         if self.xseg:
             self.xseg.shutdown()
@@ -420,7 +423,7 @@ class XsegTest(unittest.TestCase):
         if clean:
             recursive_remove(path)
 
-        return Filed(**args)
+        return Filed(user=self.user, group=self.group, **args)
 
     def get_radosd(self, args, clean=False):
         pool = args['pool']
@@ -432,13 +435,13 @@ class XsegTest(unittest.TestCase):
         cluster.create_pool(pool)
 
         cluster.shutdown()
-        return Radosd(**args)
+        return Radosd(user=self.user, group=self.group, **args)
 
     def get_mapperd(self, args):
-        return Mapperd(**args)
+        return Mapperd(user=self.user, group=self.group, **args)
 
     def get_vlmcd(self, args):
-        return Vlmcd(**args)
+        return Vlmcd(user=self.user, group=self.group, **args)
 
 class VlmcdTest(XsegTest):
     bfiled_args = {
@@ -1180,7 +1183,8 @@ class FiledTest(BlockerTest, XsegTest):
         stop_peer(self.blocker)
         new_filed_args = copy(self.filed_args)
         new_filed_args['unique_str'] = 'ThisisSparta'
-        self.blocker = Filed(**new_filed_args)
+        self.blocker = Filed(user=self.user, group=self.group,
+                             **new_filed_args)
         start_peer(self.blocker)
         self.send_and_evaluate_acquire(self.blockerport, target, expected=False)
         self.send_and_evaluate_release(self.blockerport, target, expected=False)
