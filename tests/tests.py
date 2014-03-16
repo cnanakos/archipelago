@@ -32,9 +32,20 @@
 # or implied, of GRNET S.A.
 
 import archipelago
-from archipelago.common import Xseg_ctx, Request, Filed, Mapperd, Vlmcd, Radosd, \
-        Error, Segment
-from archipelago.archipelago import start_peer, stop_peer
+from archipelago.common import (
+    Xseg_ctx,
+    Request,
+    Filed,
+    Mapperd,
+    Vlmcd,
+    Radosd,
+    Error,
+    Segment
+)
+from archipelago.archipelago import (
+    start_peer,
+    stop_peer
+)
 import random as rnd
 import unittest2 as unittest
 from xseg.xprotocol import *
@@ -43,17 +54,21 @@ import ctypes
 import os
 from copy import copy
 from sets import Set
-from binascii import hexlify, unhexlify
+from binascii import (
+    hexlify,
+    unhexlify
+)
 from hashlib import sha256
 import pwd
 import grp
 
+
 def get_random_string(length=64, repeat=16):
-    nr_repeats = length//repeat
+    nr_repeats = length // repeat
 
     l = []
     for i in range(repeat):
-        l.append(chr(ord('a') + rnd.randint(0,25)))
+        l.append(chr(ord('a') + rnd.randint(0, 25)))
     random_string = ''.join(l)
 
     l = []
@@ -64,12 +79,14 @@ def get_random_string(length=64, repeat=16):
 
     return ''.join(l)
 
+
 def recursive_remove(path):
     for root, dirs, files in os.walk(path, topdown=False):
         for name in files:
             os.remove(os.path.join(root, name))
         for name in dirs:
             os.rmdir(os.path.join(root, name))
+
 
 def merkle_hash(hashes):
     if len(hashes) == 0:
@@ -81,16 +98,17 @@ def merkle_hash(hashes):
     while s < len(hashes):
         s = s * 2
     hashes += [('\x00' * len(hashes[0]))] * (s - len(hashes))
-    while len(hashes) > 1 :
-        hashes = [sha256(hashes[i] + hashes[i + 1]).digest() for i in range (0, len(hashes), 2)]
+    while len(hashes) > 1:
+        hashes = [sha256(hashes[i] + hashes[i + 1]).digest()
+                  for i in range(0, len(hashes), 2)]
     return hashes[0]
 
 
 def init():
     rnd.seed()
 #    archipelago.common.BIN_DIR=os.path.join(os.getcwd(), '../../peers/user/')
-    archipelago.common.LOGS_PATH=os.path.join(os.getcwd(), 'logs')
-    archipelago.common.PIDFILE_PATH=os.path.join(os.getcwd(), 'pids')
+    archipelago.common.LOGS_PATH = os.path.join(os.getcwd(), 'logs')
+    archipelago.common.PIDFILE_PATH = os.path.join(os.getcwd(), 'pids')
     if not os.path.isdir(archipelago.common.LOGS_PATH):
         os.makedirs(archipelago.common.LOGS_PATH)
     if not os.path.isdir(archipelago.common.PIDFILE_PATH):
@@ -98,9 +116,10 @@ def init():
 
     recursive_remove(archipelago.common.LOGS_PATH)
 
+
 class XsegTest(unittest.TestCase):
     spec = "posix:testsegment:8:16:256:12".encode()
-    blocksize = 4*1024*1024
+    blocksize = 4 * 1024 * 1024
     segment = None
 
     def setUp(self):
@@ -113,6 +132,7 @@ class XsegTest(unittest.TestCase):
         self.xseg = Xseg_ctx(self.segment)
         self.user = pwd.getpwuid(os.geteuid()).pw_name
         self.group = grp.getgrgid(os.getegid()).gr_name
+
     def tearDown(self):
         if self.xseg:
             self.xseg.shutdown()
@@ -136,10 +156,14 @@ class XsegTest(unittest.TestCase):
     def get_object_name(volume, epoch, index):
         epoch_64 = ctypes.c_uint64(epoch)
         index_64 = ctypes.c_uint64(index)
-        epoch_64_char = ctypes.cast(ctypes.addressof(epoch_64), ctypes.c_char_p)
-        index_64_char = ctypes.cast(ctypes.addressof(index_64), ctypes.c_char_p)
-        epoch_64_str = ctypes.string_at(epoch_64_char, ctypes.sizeof(ctypes.c_uint64))
-        index_64_str = ctypes.string_at(index_64_char, ctypes.sizeof(ctypes.c_uint64))
+        epoch_64_char = ctypes.cast(ctypes.addressof(epoch_64),
+                                    ctypes.c_char_p)
+        index_64_char = ctypes.cast(ctypes.addressof(index_64),
+                                    ctypes.c_char_p)
+        epoch_64_str = ctypes.string_at(epoch_64_char,
+                                        ctypes.sizeof(ctypes.c_uint64))
+        index_64_str = ctypes.string_at(index_64_char,
+                                        ctypes.sizeof(ctypes.c_uint64))
         epoch_hex = hexlify(epoch_64_str)
         index_hex = hexlify(index_64_str)
         return "archip_" + volume + "_" + epoch_hex + "_" + index_hex
@@ -148,8 +172,8 @@ class XsegTest(unittest.TestCase):
     def get_map_reply(offset, size):
         blocksize = XsegTest.blocksize
         ret = xseg_reply_map()
-        cnt = (offset+size)//blocksize - offset//blocksize
-        if (offset+size) % blocksize > 0 :
+        cnt = (offset + size) // blocksize - offset // blocksize
+        if (offset + size) % blocksize > 0:
             cnt += 1
         ret.cnt = cnt
         SegsArray = xseg_reply_map_scatterlist * cnt
@@ -163,7 +187,7 @@ class XsegTest(unittest.TestCase):
                 segs[i].size = rem_size
             offset = 0
             rem_size -= segs[i].size
-            if rem_size < 0 :
+            if rem_size < 0:
                 raise Error("Calculation error")
         ret.segs = segs
 
@@ -184,22 +208,23 @@ class XsegTest(unittest.TestCase):
 
     @staticmethod
     def get_zero_map_reply(offset, size):
-        ret = XsegTest.get_map_reply(offset, size);
+        ret = XsegTest.get_map_reply(offset, size)
         cnt = ret.cnt
         for i in range(0, cnt):
-            ret.segs[i].target = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            ret.segs[i].target = \
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
             ret.segs[i].targetlen = len(ret.segs[i].target)
         return ret
 
     @staticmethod
     def get_copy_map_reply(volume, offset, size, epoch):
         blocksize = XsegTest.blocksize
-        objidx_start = offset//blocksize
-        ret = XsegTest.get_map_reply(offset, size);
+        objidx_start = offset // blocksize
+        ret = XsegTest.get_map_reply(offset, size)
         cnt = ret.cnt
         for i in range(0, cnt):
             ret.segs[i].target = MapperdTest.get_object_name(volume, epoch,
-                    objidx_start+i)
+                                                             objidx_start + i)
             ret.segs[i].targetlen = len(ret.segs[i].target)
         return ret
 
@@ -221,7 +246,8 @@ class XsegTest(unittest.TestCase):
             #the array, in the python object
             datasize = ctypes.sizeof(expected_data)
             datasize -= ctypes.sizeof(expected_data.segs)
-            datasize += expected_data.cnt*ctypes.sizeof(xseg_reply_map_scatterlist)
+            datasize += expected_data.cnt * \
+                    ctypes.sizeof(xseg_reply_map_scatterlist)
             self.assertEqual(datasize, req.get_datalen())
             data = req.get_data(type(expected_data)).contents
             cnt = data.cnt
@@ -232,7 +258,8 @@ class XsegTest(unittest.TestCase):
             expected_array = expected_data.segs
             for i in range(0, cnt):
                 t = ctypes.string_at(array[i].target, array[i].targetlen)
-                self.assertEqual(array[i].targetlen, expected_array[i].targetlen)
+                self.assertEqual(array[i].targetlen,
+                                 expected_array[i].targetlen)
                 self.assertEqual(t, expected_array[i].target)
                 self.assertEqual(array[i].offset, expected_array[i].offset)
                 self.assertEqual(array[i].size, expected_array[i].size)
@@ -242,7 +269,8 @@ class XsegTest(unittest.TestCase):
             data = req.get_data(type(expected_data)).contents
             self.assertEqual(data.targetlen, expected_data.targetlen)
             t = ctypes.string_at(data.target, data.targetlen)
-            et = ctypes.string_at(expected_data.target, expected_data.targetlen)
+            et = ctypes.string_at(expected_data.target,
+                                  expected_data.targetlen)
             self.assertEqual(t, et)
         else:
             raise Error("Unknown data type")
@@ -259,7 +287,8 @@ class XsegTest(unittest.TestCase):
             if isinstance(data, basestring):
                 datalen = len(data)
                 self.assertEqual(datalen, req.get_datalen())
-                self.assertEqual(data, ctypes.string_at(req.get_data(None), datalen))
+                self.assertEqual(data, ctypes.string_at(req.get_data(None),
+                                                        datalen))
             else:
                 self.assert_equal_xseg(req, data)
 
@@ -275,9 +304,11 @@ class XsegTest(unittest.TestCase):
 
     def send_write(self, dst, target, data=None, offset=0, datalen=0, flags=0):
         #assert datalen >= size
-#        req = self.get_req(X_WRITE, dst, target, data, size=size, offset=offset, datalen=datalen)
+#       req = self.get_req(X_WRITE, dst, target, data, size=size,
+#                          offset=offset, datalen=datalen)
         req = Request.get_write_request(self.xseg, dst, target, data=data,
-                offset=offset, datalen=datalen, flags=flags)
+                                        offset=offset, datalen=datalen,
+                                        flags=flags)
         req.submit()
         return req
 
@@ -285,9 +316,10 @@ class XsegTest(unittest.TestCase):
 
     def send_read(self, dst, target, size=0, datalen=0, offset=0):
         #assert datalen >= size
-#        req = self.get_req(X_READ, dst, target, data=None, size=size, offset=offset, datalen=datalen)
+#       req = self.get_req(X_READ, dst, target, data=None, size=size,
+#                          offset=offset, datalen=datalen)
         req = Request.get_read_request(self.xseg, dst, target, size=size,
-                offset=offset, datalen=datalen)
+                                       offset=offset, datalen=datalen)
         req.submit()
         return req
 
@@ -306,10 +338,12 @@ class XsegTest(unittest.TestCase):
         #xcopy = xseg_request_copy()
         #xcopy.target = src_target
         #xcopy.targetlen = len(src_target)
-#        req = self.get_req(X_COPY, dst, dst_target, data=xcopy, datalen=datalen,
-#                offset=offset, size=size)
+#       req = self.get_req(X_COPY, dst, dst_target, data=xcopy,
+#                          datalen=datalen,
+#                          offset=offset, size=size)
         req = Request.get_copy_request(self.xseg, dst, src_target,
-                copy_target=dst_target, size=size, offset=offset)
+                                       copy_target=dst_target, size=size,
+                                       offset=offset)
         req.submit()
         return req
 
@@ -343,7 +377,7 @@ class XsegTest(unittest.TestCase):
     send_and_evaluate_delete = evaluate(send_delete)
 
     def send_clone(self, dst, src_target, clone=None, clone_size=0,
-            cont_addr=False):
+                   cont_addr=False):
         #xclone = xseg_request_clone()
         #xclone.target = src_target
         #xclone.targetlen = len(src_target)
@@ -352,7 +386,8 @@ class XsegTest(unittest.TestCase):
         #req = self.get_req(X_CLONE, dst, clone, data=xclone,
                 #datalen=ctypes.sizeof(xclone))
         req = Request.get_clone_request(self.xseg, dst, src_target,
-                clone=clone, clone_size=clone_size, cont_addr=cont_addr)
+                                        clone=clone, clone_size=clone_size,
+                                        cont_addr=cont_addr)
         req.submit()
         return req
 
@@ -365,7 +400,8 @@ class XsegTest(unittest.TestCase):
 
         #req = self.get_req(X_SNAPSHOT, dst, src_target, data=xsnapshot,
                 #datalen=ctypes.sizeof(xsnapshot))
-        req = Request.get_snapshot_request(self.xseg, dst, src_target, snap=snap)
+        req = Request.get_snapshot_request(self.xseg, dst, src_target,
+                                           snap=snap)
         req.submit()
         return req
 
@@ -442,6 +478,7 @@ class XsegTest(unittest.TestCase):
 
     def get_vlmcd(self, args):
         return Vlmcd(user=self.user, group=self.group, **args)
+
 
 class VlmcdTest(XsegTest):
     bfiled_args = {
@@ -521,19 +558,19 @@ class VlmcdTest(XsegTest):
 
     def test_open(self):
         volume = "myvolume"
-        volsize = 10*1024*1024
+        volsize = 10 * 1024 * 1024
         self.send_and_evaluate_open(self.vlmcdport, volume, expected=False)
         self.send_and_evaluate_clone(self.mapperdport, "", clone=volume,
-                clone_size=volsize)
+                                     clone_size=volsize)
         self.send_and_evaluate_open(self.vlmcdport, volume)
         self.send_and_evaluate_open(self.vlmcdport, volume)
 
     def test_close(self):
         volume = "myvolume"
-        volsize = 10*1024*1024
+        volsize = 10 * 1024 * 1024
         self.send_and_evaluate_close(self.vlmcdport, volume, expected=False)
         self.send_and_evaluate_clone(self.mapperdport, "", clone=volume,
-                clone_size=volsize)
+                                     clone_size=volsize)
         self.send_and_evaluate_close(self.vlmcdport, volume, expected=False)
         self.send_and_evaluate_open(self.vlmcdport, volume)
         self.send_and_evaluate_close(self.vlmcdport, volume)
@@ -541,28 +578,29 @@ class VlmcdTest(XsegTest):
 
     def test_info(self):
         volume = "myvolume"
-        volsize = 10*1024*1024
+        volsize = 10 * 1024 * 1024
         self.send_and_evaluate_clone(self.mapperdport, "", clone=volume,
-                clone_size=volsize)
+                                     clone_size=volsize)
         xinfo = self.get_reply_info(volsize)
-        self.send_and_evaluate_info(self.vlmcdport, volume, expected_data=xinfo)
+        self.send_and_evaluate_info(self.vlmcdport, volume,
+                                    expected_data=xinfo)
 
     def test_write_read(self):
         datalen = 1024
         data = get_random_string(datalen, 16)
         volume = "myvolume"
-        volsize = 10*1024*1024
+        volsize = 10 * 1024 * 1024
 
         self.send_and_evaluate_write(self.vlmcdport, volume, data=data,
-                expected=False)
+                                     expected=False)
         self.send_and_evaluate_read(self.vlmcdport, volume, size=datalen,
-                expected=False)
+                                    expected=False)
         self.send_and_evaluate_clone(self.mapperdport, "", clone=volume,
-                clone_size=volsize)
+                                     clone_size=volsize)
         self.send_and_evaluate_write(self.vlmcdport, volume, data=data,
-                serviced=datalen)
+                                     serviced=datalen)
         self.send_and_evaluate_read(self.vlmcdport, volume, size=datalen,
-                expected_data=data)
+                                    expected_data=data)
 
     def test_clone_snapshot(self):
         volume = "myvolume"
@@ -572,56 +610,57 @@ class VlmcdTest(XsegTest):
         clone1 = "myclone1"
         clone2 = "myclone2"
 
-        volsize = 100*1024*1024*1024
-        clone2size = 200*1024*1024*1024
-        offset = 90*1024*1024*1024
-        size = 10*1024*1024
+        volsize = 100 * 1024 * 1024 * 1024
+        clone2size = 200 * 1024 * 1024 * 1024
+        offset = 90 * 1024 * 1024 * 1024
+        size = 10 * 1024 * 1024
 
         zeros = '\x00' * size
         data = get_random_string(size, 16)
         data2 = get_random_string(size, 16)
 
         self.send_and_evaluate_clone(self.mapperdport, "", clone=volume,
-                clone_size=volsize)
+                                     clone_size=volsize)
         self.send_and_evaluate_read(self.vlmcdport, volume, size=size,
-                offset=offset, expected_data=zeros)
+                                    offset=offset, expected_data=zeros)
 
         self.send_and_evaluate_snapshot(self.vlmcdport, volume, snap=snap)
         self.send_and_evaluate_read(self.vlmcdport, snap, size=size,
-                offset=offset, expected_data=zeros)
-        self.send_and_evaluate_write(self.vlmcdport, volume, data=data, offset=offset,
-                serviced=size)
+                                    offset=offset, expected_data=zeros)
+        self.send_and_evaluate_write(self.vlmcdport, volume, data=data,
+                                     offset=offset, serviced=size)
         self.send_and_evaluate_read(self.vlmcdport, snap, size=size,
-                offset=offset, expected_data=zeros)
+                                    offset=offset, expected_data=zeros)
         self.send_and_evaluate_read(self.vlmcdport, volume, size=size,
-                offset=offset, expected_data=data)
+                                    offset=offset, expected_data=data)
 
         self.send_and_evaluate_snapshot(self.vlmcdport, volume, snap=snap2)
         self.send_and_evaluate_read(self.vlmcdport, snap2, size=size,
-                offset=offset, expected_data=data)
+                                    offset=offset, expected_data=data)
         self.send_and_evaluate_clone(self.mapperdport, snap2, clone=clone1,
-                clone_size=clone2size)
+                                     clone_size=clone2size)
         self.send_and_evaluate_read(self.vlmcdport, clone1, size=size,
-                offset=offset, expected_data=data)
+                                    offset=offset, expected_data=data)
         self.send_and_evaluate_read(self.vlmcdport, clone1, size=size,
-                offset=volsize+offset, expected_data=zeros)
+                                    offset=volsize + offset,
+                                    expected_data=zeros)
 
         self.send_and_evaluate_write(self.vlmcdport, clone1, data=data2,
-				offset=offset, serviced=size)
+                                     offset=offset, serviced=size)
         self.send_and_evaluate_read(self.vlmcdport, clone1, size=size,
-                offset=offset, expected_data=data2)
+                                    offset=offset, expected_data=data2)
         self.send_and_evaluate_read(self.vlmcdport, snap2, size=size,
-                offset=offset, expected_data=data)
+                                    offset=offset, expected_data=data)
         self.send_and_evaluate_read(self.vlmcdport, volume, size=size,
-                offset=offset, expected_data=data)
+                                    offset=offset, expected_data=data)
         self.send_and_evaluate_read(self.vlmcdport, snap, size=size,
-                offset=offset, expected_data=zeros)
+                                    offset=offset, expected_data=zeros)
 
     def test_info2(self):
         volume = "myvolume"
-        volsize = 10*1024*1024
+        volsize = 10 * 1024 * 1024
         self.send_and_evaluate_clone(self.mapperdport, "", clone=volume,
-                clone_size=volsize)
+                                     clone_size=volsize)
         xinfo = self.get_reply_info(volsize)
         reqs = Set([])
         reqs.add(self.send_info(self.vlmcdport, volume))
@@ -636,30 +675,30 @@ class VlmcdTest(XsegTest):
         datalen = 1024
         data = get_random_string(datalen, 16)
         volume = "myvolume"
-        volsize = 10*1024*1024
+        volsize = 10 * 1024 * 1024
 
         #This may seems weird, but actually vlmcd flush, only guarantees that
         #there are no pending operation the volume. On a volume that does not
         #exists, this is always true, so this should succeed.
         self.send_and_evaluate_write(self.vlmcdport, volume, data="",
-                flags=XF_FLUSH, expected=True)
+                                     flags=XF_FLUSH, expected=True)
         self.send_and_evaluate_clone(self.mapperdport, "", clone=volume,
-                clone_size=volsize)
+                                     clone_size=volsize)
         self.send_and_evaluate_write(self.vlmcdport, volume, data="",
-                flags=XF_FLUSH)
+                                     flags=XF_FLUSH)
         self.send_and_evaluate_write(self.vlmcdport, volume, data=data,
-                serviced=datalen)
+                                     serviced=datalen)
         self.send_and_evaluate_write(self.vlmcdport, volume, data="",
-                flags=XF_FLUSH)
+                                     flags=XF_FLUSH)
 
     def test_flush2(self):
         volume = "myvolume"
-        volsize = 10*1024*1024
+        volsize = 10 * 1024 * 1024
         datalen = 1024
         data = get_random_string(datalen, 16)
 
         self.send_and_evaluate_clone(self.mapperdport, "", clone=volume,
-                clone_size=volsize)
+                                     clone_size=volsize)
         xinfo = self.get_reply_info(volsize)
         reqs = Set([])
         reqs.add(self.send_write(self.vlmcdport, volume, data=data))
@@ -675,7 +714,8 @@ class VlmcdTest(XsegTest):
         reqs.add(self.send_write(self.vlmcdport, volume, data=data))
         reqs.add(self.send_write(self.vlmcdport, volume, data=data))
         reqs.add(self.send_write(self.vlmcdport, volume, data=data))
-        reqs.add(self.send_write(self.vlmcdport, volume, data="", flags=XF_FLUSH))
+        reqs.add(self.send_write(self.vlmcdport, volume, data="",
+                                 flags=XF_FLUSH))
         reqs.add(self.send_write(self.vlmcdport, volume, data=data))
         reqs.add(self.send_write(self.vlmcdport, volume, data=data))
         reqs.add(self.send_write(self.vlmcdport, volume, data=data))
@@ -694,21 +734,21 @@ class VlmcdTest(XsegTest):
         volume2 = "myvolume2"
         snap = "snapshot"
         clone = "clone"
-        volsize = 10*1024*1024
-        size = 512*1024
+        volsize = 10 * 1024 * 1024
+        size = 512 * 1024
         epoch = 1
         offset = 0
         data = get_random_string(size, 16)
 
         self.send_and_evaluate_clone(self.mapperdport, "", clone=volume,
-                clone_size=volsize)
+                                     clone_size=volsize)
         self.send_and_evaluate_write(self.vlmcdport, volume, data=data,
-				offset=offset, serviced=size)
+                                     offset=offset, serviced=size)
 
         self.send_and_evaluate_snapshot(self.vlmcdport, volume, snap=snap)
 
         self.send_and_evaluate_hash(self.mapperdport, volume, size=volsize,
-                expected=False)
+                                    expected=False)
         req = self.send_hash(self.mapperdport, snap, size=volsize)
         req.wait()
         self.assertTrue(req.success())
@@ -717,7 +757,7 @@ class VlmcdTest(XsegTest):
         req.put()
 
         req = self.send_map_read(self.mapperdport, snap, offset=0,
-                size=volsize)
+                                 size=volsize)
         req.wait()
         self.assertTrue(req.success())
         xreply = req.get_data(xseg_reply_map).contents
@@ -732,20 +772,22 @@ class VlmcdTest(XsegTest):
             req.wait()
             self.assertTrue(req.success())
             xreply = req.get_data(xseg_reply_hash).contents
-            h.append(unhexlify(ctypes.string_at(xreply.target, xreply.targetlen)))
+            h.append(unhexlify(ctypes.string_at(xreply.target,
+                                                xreply.targetlen)))
             req.put()
 
         mh = hexlify(merkle_hash(h))
         self.assertEqual(hash_map, mh)
 
         self.send_and_evaluate_clone(self.mapperdport, hash_map, clone=volume2,
-                clone_size=volsize * 2, expected=False)
+                                     clone_size=volsize * 2, expected=False)
         self.send_and_evaluate_clone(self.mapperdport, hash_map, clone=volume2,
-                clone_size=volsize * 2, cont_addr=True)
+                                     clone_size=volsize * 2, cont_addr=True)
         self.send_and_evaluate_read(self.vlmcdport, volume2, size=size,
-                offset=offset, expected_data=data)
-        self.send_and_evaluate_read(self.vlmcdport, volume2, size=volsize - size,
-                offset=offset + size, expected_data='\x00' * (volsize - size))
+                                    offset=offset, expected_data=data)
+        self.send_and_evaluate_read(self.vlmcdport, volume2,
+                                    size=volsize - size, offset=offset + size,
+                                    expected_data='\x00' * (volsize - size))
 
 
 class MapperdTest(XsegTest):
@@ -782,7 +824,7 @@ class MapperdTest(XsegTest):
             'blockerb_port': 0,
             'blockerm_port': 1,
             }
-    blocksize = 4*1024*1024
+    blocksize = 4 * 1024 * 1024
 
     def setUp(self):
         super(MapperdTest, self).setUp()
@@ -810,38 +852,40 @@ class MapperdTest(XsegTest):
 
     def test_create(self):
         volume = "myvolume"
-        volsize = 10*1024*1024
+        volsize = 10 * 1024 * 1024
         self.send_and_evaluate_clone(self.mapperdport, "", clone=volume,
-                clone_size=0, expected=False)
+                                     clone_size=0, expected=False)
         self.send_and_evaluate_clone(self.mapperdport, "", clone=volume,
-                clone_size=volsize)
+                                     clone_size=volsize)
         self.send_and_evaluate_clone(self.mapperdport, "", clone=volume,
-                clone_size=volsize, expected=False)
+                                     clone_size=volsize, expected=False)
 
     def test_delete(self):
         volume = "myvolume"
-        volsize = 10*1024*1024
+        volsize = 10 * 1024 * 1024
         offset = 0
         size = 10
         epoch = 2
 
         self.send_and_evaluate_clone(self.mapperdport, "", clone=volume,
-                clone_size=0, expected=False)
+                                     clone_size=0, expected=False)
         self.send_and_evaluate_clone(self.mapperdport, "", clone=volume,
-                clone_size=volsize)
+                                    clone_size=volsize)
         self.send_and_evaluate_clone(self.mapperdport, "", clone=volume,
-                clone_size=volsize, expected=False)
+                                     clone_size=volsize, expected=False)
         self.send_and_evaluate_delete(self.mapperdport, volume)
         self.send_and_evaluate_delete(self.mapperdport, volume, expected=False)
         self.send_and_evaluate_map_write(self.mapperdport, volume,
-                offset=offset, size=size, expected=False)
+                                         offset=offset, size=size,
+                                         expected=False)
         self.send_and_evaluate_clone(self.mapperdport, "", clone=volume,
-                clone_size=volsize)
+                                     clone_size=volsize)
 
         ret = self.get_copy_map_reply(volume, offset, size, epoch)
 
         self.send_and_evaluate_map_write(self.mapperdport, volume,
-                expected_data=ret, offset=offset, size=size)
+                                         expected_data=ret, offset=offset,
+                                         size=size)
 
     def test_clone_snapshot(self):
         volume = "myvolume"
@@ -850,59 +894,67 @@ class MapperdTest(XsegTest):
         snap2 = "mysnapshot3"
         clone1 = "myclone1"
         clone2 = "myclone2"
-        volsize = 100*1024*1024*1024
-        clone2size = 200*1024*1024*1024
-        offset = 90*1024*1024*1024
-        size = 10*1024*1024
+        volsize = 100 * 1024 * 1024 * 1024
+        clone2size = 200 * 1024 * 1024 * 1024
+        offset = 90 * 1024 * 1024 * 1024
+        size = 10 * 1024 * 1024
         offset = 0
         size = volsize
         epoch = 2
 
         self.send_and_evaluate_clone(self.mapperdport, "", clone=volume,
-                clone_size=volsize)
+                                     clone_size=volsize)
         self.send_and_evaluate_snapshot(self.mapperdport, volume, snap=snap)
         self.send_and_evaluate_snapshot(self.mapperdport, volume, snap=snap,
-                expected=False)
+                                        expected=False)
         xinfo = self.get_reply_info(volsize)
-        self.send_and_evaluate_info(self.mapperdport, snap, expected_data=xinfo)
+        self.send_and_evaluate_info(self.mapperdport, snap,
+                                    expected_data=xinfo)
         ret = self.get_zero_map_reply(offset, size)
         self.send_and_evaluate_map_read(self.mapperdport, volume,
-                expected_data=ret, offset=offset, size=size)
+                                        expected_data=ret, offset=offset,
+                                        size=size)
         self.send_and_evaluate_map_read(self.mapperdport, snap,
-                expected_data=ret, offset=offset, size=size)
+                                        expected_data=ret, offset=offset,
+                                        size=size)
 
         ret = self.get_copy_map_reply(volume, offset, size, epoch)
         self.send_and_evaluate_map_write(self.mapperdport, volume,
-                expected_data=ret, offset=offset, size=size)
+                                         expected_data=ret, offset=offset,
+                                         size=size)
 
         stop_peer(self.mapperd)
         start_peer(self.mapperd)
         self.send_and_evaluate_map_read(self.mapperdport, volume,
-                expected_data=ret, offset=offset, size=size)
+                                        expected_data=ret, offset=offset,
+                                        size=size)
 
         self.send_and_evaluate_clone(self.mapperdport, snap, clone=clone1)
         xinfo = self.get_reply_info(volsize)
-        self.send_and_evaluate_info(self.mapperdport, clone1, expected_data=xinfo)
+        self.send_and_evaluate_info(self.mapperdport, clone1,
+                                    expected_data=xinfo)
         self.send_and_evaluate_clone(self.mapperdport, snap, clone=clone2,
-                clone_size=2, expected=False)
+                                     clone_size=2, expected=False)
         self.send_and_evaluate_clone(self.mapperdport, snap, clone=clone2,
-                clone_size=clone2size)
+                                     clone_size=clone2size)
         xinfo = self.get_reply_info(clone2size)
-        self.send_and_evaluate_info(self.mapperdport, clone2, expected_data=xinfo)
+        self.send_and_evaluate_info(self.mapperdport, clone2,
+                                    expected_data=xinfo)
 
     def test_info(self):
         volume = "myvolume"
-        volsize = 10*1024*1024
+        volsize = 10 * 1024 * 1024
         self.send_and_evaluate_clone(self.mapperdport, "", clone=volume,
-                clone_size=volsize)
+                                     clone_size=volsize)
         xinfo = self.get_reply_info(volsize)
-        self.send_and_evaluate_info(self.mapperdport, volume, expected_data=xinfo)
+        self.send_and_evaluate_info(self.mapperdport, volume,
+                                    expected_data=xinfo)
 
     def test_info2(self):
         volume = "myvolume"
-        volsize = 10*1024*1024
+        volsize = 10 * 1024 * 1024
         self.send_and_evaluate_clone(self.mapperdport, "", clone=volume,
-                clone_size=volsize)
+                                     clone_size=volsize)
         xinfo = self.get_reply_info(volsize)
         reqs = Set([])
         reqs.add(self.send_info(self.mapperdport, volume))
@@ -915,18 +967,18 @@ class MapperdTest(XsegTest):
 
     def test_open(self):
         volume = "myvolume"
-        volsize = 10*1024*1024
+        volsize = 10 * 1024 * 1024
         self.send_and_evaluate_open(self.mapperdport, volume, expected=False)
         self.send_and_evaluate_clone(self.mapperdport, "", clone=volume,
-                clone_size=volsize)
+                                     clone_size=volsize)
         self.send_and_evaluate_open(self.mapperdport, volume)
         self.send_and_evaluate_open(self.mapperdport, volume)
 
     def test_open2(self):
         volume = "myvolume"
-        volsize = 10*1024*1024
+        volsize = 10 * 1024 * 1024
         self.send_and_evaluate_clone(self.mapperdport, "", clone=volume,
-                clone_size=volsize)
+                                     clone_size=volsize)
         reqs = Set([])
         reqs.add(self.send_open(self.mapperdport, volume))
         reqs.add(self.send_open(self.mapperdport, volume))
@@ -938,10 +990,10 @@ class MapperdTest(XsegTest):
 
     def test_close(self):
         volume = "myvolume"
-        volsize = 10*1024*1024
+        volsize = 10 * 1024 * 1024
         self.send_and_evaluate_close(self.mapperdport, volume, expected=False)
         self.send_and_evaluate_clone(self.mapperdport, "", clone=volume,
-                clone_size=volsize)
+                                     clone_size=volsize)
         self.send_and_evaluate_close(self.mapperdport, volume, expected=False)
         self.send_and_evaluate_open(self.mapperdport, volume)
         self.send_and_evaluate_close(self.mapperdport, volume)
@@ -949,36 +1001,40 @@ class MapperdTest(XsegTest):
 
     def test_mapr(self):
         volume = "myvolume"
-        volsize = 10*1024*1024
+        volsize = 10 * 1024 * 1024
         offset = 0
         size = volsize
         ret = MapperdTest.get_zero_map_reply(offset, size)
         self.send_and_evaluate_map_read(self.mapperdport, volume,
-                offset=offset, size=size, expected=False)
+                                        offset=offset, size=size,
+                                        expected=False)
         self.send_and_evaluate_clone(self.mapperdport, "", clone=volume,
-                clone_size=volsize)
+                                     clone_size=volsize)
         self.send_and_evaluate_map_read(self.mapperdport, volume,
-                expected_data=ret, offset=offset, size=size)
+                                        expected_data=ret,
+                                        offset=offset, size=size)
         offset = volsize - 1
         self.send_and_evaluate_map_read(self.mapperdport, volume,
-                offset=offset, size=size, expected=False)
+                                        offset=offset, size=size,
+                                        expected=False)
         offset = volsize + 1
         self.send_and_evaluate_map_read(self.mapperdport, volume,
-                offset=offset, size=size, expected=False)
+                                        offset=offset, size=size,
+                                        expected=False)
 
     def test_mapr2(self):
         volume = "myvolume"
-        volsize = 10*1024*1024
+        volsize = 10 * 1024 * 1024
         offset = 0
         size = volsize
 
         self.send_and_evaluate_clone(self.mapperdport, "", clone=volume,
-                clone_size=volsize)
+                                     clone_size=volsize)
         reqs = Set([])
         reqs.add(self.send_map_read(self.mapperdport, volume, offset=offset,
-            size=size))
+                                    size=size))
         reqs.add(self.send_map_read(self.mapperdport, volume, offset=offset,
-            size=size))
+                                    size=size))
         ret = MapperdTest.get_zero_map_reply(offset, size)
         while len(reqs) > 0:
             req = self.xseg.wait_requests(reqs)
@@ -989,66 +1045,73 @@ class MapperdTest(XsegTest):
     def test_mapw(self):
         blocksize = self.blocksize
         volume = "myvolume"
-        volsize = 100*1024*1024*1024
-        offset = 90*1024*1024*1024 - 2
-        size = 512*1024
+        volsize = 100 * 1024 * 1024 * 1024
+        offset = 90 * 1024 * 1024 * 1024 - 2
+        size = 512 * 1024
         epoch = 1
 
         ret = self.get_copy_map_reply(volume, offset, size, epoch)
 
         self.send_and_evaluate_map_write(self.mapperdport, volume,
-                offset=offset, size=size, expected=False)
+                                         offset=offset,
+                                         size=size, expected=False)
         self.send_and_evaluate_clone(self.mapperdport, "", clone=volume,
-                clone_size=volsize)
+                                     clone_size=volsize)
         self.send_and_evaluate_map_write(self.mapperdport, volume,
-                expected_data=ret, offset=offset, size=size)
+                                         expected_data=ret,
+                                         offset=offset, size=size)
         self.send_and_evaluate_map_read(self.mapperdport, volume,
-                expected_data = ret, offset=offset, size=size)
+                                        expected_data=ret,
+                                        offset=offset, size=size)
         stop_peer(self.mapperd)
         start_peer(self.mapperd)
         self.send_and_evaluate_map_read(self.mapperdport, volume,
-                expected_data=ret, offset=offset, size=size)
+                                        expected_data=ret,
+                                        offset=offset, size=size)
         self.send_and_evaluate_open(self.mapperdport, volume)
-        offset = 101*1024*1024*1024
+        offset = 101 * 1024 * 1024 * 1024
         self.send_and_evaluate_map_write(self.mapperdport, volume,
-                offset=offset, size=size, expected=False)
-        offset = 100*1024*1024*1024 - 1
+                                         offset=offset,
+                                         size=size, expected=False)
+        offset = 100 * 1024 * 1024 * 1024 - 1
         self.send_and_evaluate_map_write(self.mapperdport, volume,
-                offset=offset, size=size, expected=False)
+                                         offset=offset, size=size,
+                                         expected=False)
 
     def test_mapw2(self):
         blocksize = self.blocksize
         volume = "myvolume"
-        volsize = 100*1024*1024*1024
-        offset = 90*1024*1024*1024 - 2
-        size = 512*1024
+        volsize = 100 * 1024 * 1024 * 1024
+        offset = 90 * 1024 * 1024 * 1024 - 2
+        size = 512 * 1024
         epoch = 1
 
         ret = self.get_copy_map_reply(volume, offset, size, epoch)
 
         self.send_and_evaluate_clone(self.mapperdport, "", clone=volume,
-                clone_size=volsize)
+                                     clone_size=volsize)
 
         reqs = Set([])
         reqs.add(self.send_map_write(self.mapperdport, volume, offset=offset,
-            size=size))
+                                     size=size))
         reqs.add(self.send_map_write(self.mapperdport, volume, offset=offset,
-            size=size))
+                                     size=size))
         reqs.add(self.send_map_write(self.mapperdport, volume, offset=offset,
-            size=size))
+                                     size=size))
         reqs.add(self.send_map_write(self.mapperdport, volume, offset=offset,
-            size=size))
+                                     size=size))
         reqs.add(self.send_map_write(self.mapperdport, volume, offset=offset,
-            size=size))
+                                     size=size))
         reqs.add(self.send_map_write(self.mapperdport, volume, offset=offset,
-            size=size))
+                                     size=size))
         reqs.add(self.send_map_write(self.mapperdport, volume, offset=offset,
-            size=size))
+                                     size=size))
         while len(reqs) > 0:
             req = self.xseg.wait_requests(reqs)
             self.evaluate_req(req, data=ret)
             reqs.remove(req)
             self.assertTrue(req.put())
+
 
 class BlockerTest(object):
     def test_write_read(self):
@@ -1058,24 +1121,27 @@ class BlockerTest(object):
         xinfo = self.get_reply_info(datalen)
 
         self.send_and_evaluate_write(self.blockerport, target, data=data,
-                serviced=datalen)
+                                     serviced=datalen)
         self.send_and_evaluate_read(self.blockerport, target, size=datalen,
-                expected_data=data)
-        self.send_and_evaluate_info(self.blockerport, target, expected_data=xinfo)
+                                    expected_data=data)
+        self.send_and_evaluate_info(self.blockerport, target,
+                                    expected_data=xinfo)
         stop_peer(self.blocker)
         start_peer(self.blocker)
         self.send_and_evaluate_read(self.blockerport, target, size=datalen,
-                expected_data=data)
-        self.send_and_evaluate_info(self.blockerport, target, expected_data=xinfo)
+                                    expected_data=data)
+        self.send_and_evaluate_info(self.blockerport, target,
+                                    expected_data=xinfo)
 
     def test_info(self):
         datalen = 1024
         data = get_random_string(datalen, 16)
         target = "mytarget"
         self.send_and_evaluate_write(self.blockerport, target, data=data,
-                serviced=datalen)
+                                     serviced=datalen)
         xinfo = self.get_reply_info(datalen)
-        self.send_and_evaluate_info(self.blockerport, target, expected_data=xinfo)
+        self.send_and_evaluate_info(self.blockerport, target,
+                                    expected_data=xinfo)
 
     def test_copy(self):
         datalen = 1024
@@ -1084,16 +1150,17 @@ class BlockerTest(object):
         copy_target = "copy_target"
 
         self.send_and_evaluate_write(self.blockerport, target, data=data,
-                serviced=datalen)
+                                     serviced=datalen)
         self.send_and_evaluate_read(self.blockerport, target, size=datalen,
-                expected_data=data, serviced=datalen)
-        self.send_and_evaluate_copy(self.blockerport, target, dst_target=copy_target,
-                size=datalen, serviced=datalen)
-        self.send_and_evaluate_copy(self.blockerport, target, dst_target=copy_target,
-                size=datalen+1, serviced=datalen+1)
-        self.send_and_evaluate_read(self.blockerport, copy_target, size=datalen,
-                expected_data=data)
-
+                                    expected_data=data, serviced=datalen)
+        self.send_and_evaluate_copy(self.blockerport, target,
+                                    dst_target=copy_target, size=datalen,
+                                    serviced=datalen)
+        self.send_and_evaluate_copy(self.blockerport, target,
+                                    dst_target=copy_target, size=datalen + 1,
+                                    serviced=datalen + 1)
+        self.send_and_evaluate_read(self.blockerport, copy_target,
+                                    size=datalen, expected_data=data)
 
     def test_delete(self):
         datalen = 1024
@@ -1102,48 +1169,55 @@ class BlockerTest(object):
         self.send_and_evaluate_delete(self.blockerport, target, False)
         self.send_and_evaluate_write(self.blockerport, target, data=data)
         self.send_and_evaluate_read(self.blockerport, target, size=datalen,
-                expected_data=data)
+                                    expected_data=data)
         self.send_and_evaluate_delete(self.blockerport, target, True)
         data = '\x00' * datalen
-        self.send_and_evaluate_read(self.blockerport, target, size=datalen, expected_data=data)
+        self.send_and_evaluate_read(self.blockerport, target, size=datalen,
+                                    expected_data=data)
 
     def test_hash(self):
         datalen = 1024
-        data = '\x00'*datalen
+        data = '\x00' * datalen
         target = "target_zeros"
 
-
         self.send_and_evaluate_write(self.blockerport, target, data=data,
-                serviced=datalen)
+                                     serviced=datalen)
         ret = self.get_hash_reply(sha256(data.rstrip('\x00')).hexdigest())
         self.send_and_evaluate_hash(self.blockerport, target, size=datalen,
-                expected_data=ret, serviced=datalen)
+                                    expected_data=ret, serviced=datalen)
 
         target = "mytarget"
         data = get_random_string(datalen, 16)
         self.send_and_evaluate_write(self.blockerport, target, data=data,
-                serviced=datalen)
+                                     serviced=datalen)
         ret = self.get_hash_reply(sha256(data.rstrip('\x00')).hexdigest())
         self.send_and_evaluate_hash(self.blockerport, target, size=datalen,
-                expected_data=ret, serviced=datalen)
+                                    expected_data=ret, serviced=datalen)
         self.send_and_evaluate_hash(self.blockerport, target, size=datalen,
-                expected_data=ret, serviced=datalen)
+                                    expected_data=ret, serviced=datalen)
         self.send_and_evaluate_hash(self.blockerport, target, size=datalen,
-                expected_data=ret, serviced=datalen)
+                                    expected_data=ret, serviced=datalen)
 
     def test_locking(self):
         target = "mytarget"
-        self.send_and_evaluate_acquire(self.blockerport, target, expected=True)
-        self.send_and_evaluate_acquire(self.blockerport, target, expected=True)
-        self.send_and_evaluate_release(self.blockerport, target, expected=True)
-        self.send_and_evaluate_release(self.blockerport, target, expected=False)
-        self.send_and_evaluate_acquire(self.blockerport, target, expected=True)
+        self.send_and_evaluate_acquire(self.blockerport, target,
+                                       expected=True)
+        self.send_and_evaluate_acquire(self.blockerport, target,
+                                       expected=True)
+        self.send_and_evaluate_release(self.blockerport, target,
+                                       expected=True)
+        self.send_and_evaluate_release(self.blockerport, target,
+                                       expected=False)
+        self.send_and_evaluate_acquire(self.blockerport, target,
+                                       expected=True)
         stop_peer(self.blocker)
         start_peer(self.blocker)
-        self.send_and_evaluate_acquire(self.blockerport, target, expected=False)
-        self.send_and_evaluate_release(self.blockerport, target, expected=False)
+        self.send_and_evaluate_acquire(self.blockerport, target,
+                                       expected=False)
+        self.send_and_evaluate_release(self.blockerport, target,
+                                       expected=False)
         self.send_and_evaluate_release(self.blockerport, target, force=True,
-                expected=True)
+                                       expected=True)
 
 
 class FiledTest(BlockerTest, XsegTest):
@@ -1175,21 +1249,29 @@ class FiledTest(BlockerTest, XsegTest):
 
     def test_locking(self):
         target = "mytarget"
-        self.send_and_evaluate_acquire(self.blockerport, target, expected=True)
-        self.send_and_evaluate_acquire(self.blockerport, target, expected=True)
-        self.send_and_evaluate_release(self.blockerport, target, expected=True)
-        self.send_and_evaluate_release(self.blockerport, target, expected=False)
-        self.send_and_evaluate_acquire(self.blockerport, target, expected=True)
+        self.send_and_evaluate_acquire(self.blockerport, target,
+                                       expected=True)
+        self.send_and_evaluate_acquire(self.blockerport, target,
+                                       expected=True)
+        self.send_and_evaluate_release(self.blockerport, target,
+                                       expected=True)
+        self.send_and_evaluate_release(self.blockerport, target,
+                                       expected=False)
+        self.send_and_evaluate_acquire(self.blockerport, target,
+                                       expected=True)
         stop_peer(self.blocker)
         new_filed_args = copy(self.filed_args)
         new_filed_args['unique_str'] = 'ThisisSparta'
         self.blocker = Filed(user=self.user, group=self.group,
                              **new_filed_args)
         start_peer(self.blocker)
-        self.send_and_evaluate_acquire(self.blockerport, target, expected=False)
-        self.send_and_evaluate_release(self.blockerport, target, expected=False)
+        self.send_and_evaluate_acquire(self.blockerport, target,
+                                       expected=False)
+        self.send_and_evaluate_release(self.blockerport, target,
+                                       expected=False)
         self.send_and_evaluate_release(self.blockerport, target, force=True,
-                expected=True)
+                                       expected=True)
+
 
 class RadosdTest(BlockerTest, XsegTest):
     filed_args = {
@@ -1218,6 +1300,6 @@ class RadosdTest(BlockerTest, XsegTest):
         stop_peer(self.blocker)
         super(RadosdTest, self).tearDown()
 
-if __name__=='__main__':
+if __name__ == '__main__':
     init()
     unittest.main()

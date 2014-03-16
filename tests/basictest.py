@@ -31,25 +31,35 @@
 # interpreted as representing official policies, either expressed
 # or implied, of GRNET S.A.
 
-from archipelago.common import loadrc, DEVICE_PREFIX, Error, construct_peers
+from archipelago.common import (
+    loadrc,
+    DEVICE_PREFIX,
+    Error,
+    construct_peers
+)
 import archipelago.vlmc as vlmc
 import archipelago.archipelago as archipelago
 
-import os, errno
+import os
+import errno
 import tempfile
 from subprocess import check_call
+
 
 def gettempname(prefix='myvolume-'):
     t = tempfile.mktemp(prefix=prefix)
     return os.path.basename(t)
 
+
 def getrandomdata(size):
     return os.urandom(size)
 
+
 def getrandomfile(size):
-    randomfile = gettempname(prefix='random-') 
+    randomfile = gettempname(prefix='random-')
     randomdata = getrandomdata(size)
     return (randomfile, randomdata)
+
 
 def is_mounted(device):
     lines = open("/proc/mounts").read().split("\n")
@@ -59,12 +69,14 @@ def is_mounted(device):
             return True
     return False
 
+
 def mount(device, directory):
     cmd = ['mount', device, directory]
     try:
         check_call(cmd, shell=False)
     except:
         raise Error("Cannot mount %s to %s" % (device, directory))
+
 
 def umount(device):
     if not is_mounted(device):
@@ -85,16 +97,16 @@ def test_create(volume, volumesize=None, snap=None, cont_addr=False):
 
 
 def write(volume, volumesize):
-    d_id=vlmc.map_volume(name=volume)
+    d_id = vlmc.map_volume(name=volume)
     device = DEVICE_PREFIX + str(d_id)
     try:
         fd = os.open(device, os.O_WRONLY)
-        os.lseek(fd, (volumesize*1024*1024)+1, os.SEEK_SET)
+        os.lseek(fd, (volumesize * 1024 * 1024) + 1, os.SEEK_SET)
         os.write(fd, "This should not succeed")
         print ("wtf")
     except OSError, (err, reason):
         if err != errno.EINVAL:
-            raise Error("Cannot write to device %s : %s" % (device,reason))
+            raise Error("Cannot write to device %s : %s" % (device, reason))
     finally:
         if fd:
             os.close(fd)
@@ -102,7 +114,7 @@ def write(volume, volumesize):
 
 
 def mkfs_and_mount(volume, mountdir):
-    d_id=vlmc.map_volume(name=volume)
+    d_id = vlmc.map_volume(name=volume)
     device = DEVICE_PREFIX + str(d_id)
 
     cmd = ['mkfs.ext3', device]
@@ -115,7 +127,7 @@ def mkfs_and_mount(volume, mountdir):
 
 
 def write_data(volume, mountdir, randomfiles):
-    d_id=vlmc.map_volume(name=volume)
+    d_id = vlmc.map_volume(name=volume)
     device = DEVICE_PREFIX + str(d_id)
     try:
         mount(device, mountdir)
@@ -128,8 +140,9 @@ def write_data(volume, mountdir, randomfiles):
         umount(device)
         vlmc.unmap_volume(name=device)
 
+
 def read_data(volume, mountdir, randomfiles):
-    d_id=vlmc.map_volume(name=volume)
+    d_id = vlmc.map_volume(name=volume)
     device = DEVICE_PREFIX + str(d_id)
     try:
         mount(device, mountdir)
@@ -144,15 +157,16 @@ def read_data(volume, mountdir, randomfiles):
         umount(device)
         vlmc.unmap_volume(name=device)
 
+
 def snapshot(volume):
     vlmc.snapshot(name=volume)
 
 if __name__ == '__main__':
     loadrc(None)
     peers = construct_peers()
-    tmpvolume=gettempname()
+    tmpvolume = gettempname()
     mntdir = '/mnt/mountpoint'
-    RANDOMSIZE=20*1024*1024
+    RANDOMSIZE = 20 * 1024 * 1024
 
     test_create(tmpvolume, volumesize=10240)
     try:
@@ -165,10 +179,10 @@ if __name__ == '__main__':
         read_data(tmpvolume, mntdir, rf)
 
         #snapshot
-        snapname=gettempname(prefix="snapshot")
+        snapname = gettempname(prefix="snapshot")
         print "Snapshot ", tmpvolume, "to", snapname
         snap = vlmc.snapshot(name=tmpvolume, snap_name=snapname)
-        clonedvolume=gettempname()
+        clonedvolume = gettempname()
         print "Cloning ", snapname, "to", clonedvolume
         test_create(clonedvolume, snap=snapname)
     except Exception as e:
@@ -198,6 +212,3 @@ if __name__ == '__main__':
     finally:
         vlmc.remove(name=tmpvolume)
         vlmc.remove(name=clonedvolume)
-
-
-
