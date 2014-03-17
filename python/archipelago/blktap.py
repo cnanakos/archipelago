@@ -34,6 +34,13 @@
 import os
 import subprocess
 
+TapdiskState = {
+    '0': 'OPEN',
+    '0x2a': 'PAUSED',
+    '0x2': 'CLOSED',
+    '0x100': 'DEAD',
+}
+
 
 def cmd_open(cmd, bufsize=-1, env=None):
     inst = subprocess.Popen(cmd, shell=True, bufsize=bufsize,

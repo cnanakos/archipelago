@@ -42,7 +42,10 @@ from binascii import hexlify
 from ctypes import c_uint32, c_uint64
 
 from .common import *
-from blktap import VlmcTapdisk
+from blktap import (
+    VlmcTapdisk,
+    TapdiskState,
+)
 
 
 @exclusive()
@@ -57,10 +60,16 @@ def showmapped():
         print ""
         return 0
 
-    print "id\timage\t\tdevice"
-    for m in mapped:
-        print "%s\t%s\t%s" % (m.minor, m.volume, m.device)
+    max_len = len(max(mapped, key=lambda x:
+                      len(x.volume) if x.volume else 0).volume)
 
+    print "%*s %*s %*s %*s %*s" % (-10, "id", -max_len - 2, "image", -30,
+                                   "device", -8, "state", -5, "PID")
+
+    for m in mapped:
+        print "%*s %*s %*s %*s %*s" % (-10, str(m.minor), -max_len - 2,
+                                       m.volume, -30, m.device, -8,
+                                       TapdiskState[m.state], -5, m.pid)
     return len(mapped)
 
 
