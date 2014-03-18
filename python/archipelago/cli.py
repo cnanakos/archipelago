@@ -38,7 +38,11 @@
 import os
 import sys
 import argparse
-from .common import *
+from common import (
+    loadrc,
+    red,
+    Error,
+)
 
 
 def vlmc_parser():

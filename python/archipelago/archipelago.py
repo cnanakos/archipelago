@@ -35,15 +35,25 @@
 #
 
 
-import os
 import sys
 import time
-import errno
-from subprocess import check_call
 
-from .common import *
-from .vlmc import showmapped as vlmc_showmapped
-from .vlmc import get_mapped as vlmc_get_mapped
+from common import (
+    FIRST_COLUMN_WIDTH,
+    SECOND_COLUMN_WIDTH,
+    red,
+    green,
+    yellow,
+    get_segment,
+    pretty_print,
+    loaded_module,
+    load_module,
+    config,
+    peers,
+    Error,
+)
+from vlmc import showmapped as vlmc_showmapped
+from vlmc import get_mapped as vlmc_get_mapped
 from blktap import VlmcTapdisk
 
 
