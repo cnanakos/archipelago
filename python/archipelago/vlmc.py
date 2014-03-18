@@ -60,8 +60,11 @@ def showmapped(**kwargs):
         print ""
         return 0
 
-    max_len = len(max(mapped, key=lambda x:
-                      len(x.volume) if x.volume else 0).volume)
+    try:
+        max_len = len(max(mapped, key=lambda x:
+                          len(x.volume) if x.volume else 0).volume)
+    except TypeError:
+        max_len = 0
 
     print "%*s %*s %*s %*s %*s" % (-10, "id", -max_len - 2, "image", -30,
                                    "device", -8, "state", -5, "PID")
