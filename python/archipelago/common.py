@@ -853,17 +853,6 @@ def load_module(name, args):
         sys.stdout.write("\n")
         return
     cmd = ["modprobe", "%s" % name]
-
-
-def load_module(name, args):
-    s = "Loading %s " % name
-    sys.stdout.write(s.ljust(FIRST_COLUMN_WIDTH))
-    modules = loaded_modules()
-    if name in modules:
-        sys.stdout.write(yellow("Already loaded".ljust(SECOND_COLUMN_WIDTH)))
-        sys.stdout.write("\n")
-        return
-    cmd = ["modprobe", "%s" % name]
     modules = loaded_modules()
     if name in modules:
         sys.stdout.write(yellow("Already loaded".ljust(SECOND_COLUMN_WIDTH)))
