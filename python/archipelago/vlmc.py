@@ -53,7 +53,7 @@ def get_mapped():
     return VlmcTapdisk.list()
 
 
-def showmapped():
+def showmapped(**kwargs):
     mapped = get_mapped()
     if not mapped:
         print "No volumes mapped"
@@ -71,10 +71,6 @@ def showmapped():
                                        m.volume, -30, m.device, -8,
                                        TapdiskState[m.state], -5, m.pid)
     return len(mapped)
-
-
-def showmapped_wrapper(**kwargs):
-    showmapped()
 
 
 def is_mapped(volume):

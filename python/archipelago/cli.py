@@ -89,7 +89,7 @@ def vlmc_parser():
 
     showmapped_parser = subparsers.add_parser('showmapped',
                                               help='Show mapped volumes')
-    showmapped_parser.set_defaults(func=vlmc.showmapped_wrapper)
+    showmapped_parser.set_defaults(func=vlmc.showmapped)
     showmapped_parser.add_argument('-p', '--pool', type=str, nargs='?',
                                    help='for backwards compatiblity with rbd')
 
