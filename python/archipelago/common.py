@@ -93,6 +93,7 @@ VLMC_LOCK_FILE = 'vlmc.lock'
 LOGS_PATH = "/var/log/archipelago"
 LOCK_PATH = "/var/lock"
 DEVICE_PREFIX = "/dev/xen/blktap-2/tapdev"
+POSIXFD_PATH = "/run/shm/posixfd"
 
 REQS = 512
 
@@ -226,6 +227,14 @@ class Peer(object):
                 pass
             else:
                 raise Error("Cannot write to file '%s'" % self.pidfile)
+        except OSError, er:
+            pass
+
+        try:
+            if is_file_writable(POSIXFD_PATH, self.user_uid, self.group_gid):
+                pass
+            else:
+                raise Error("Cannot write to directory '%s'" % POSIXFD_PATH)
         except OSError, er:
             pass
 
