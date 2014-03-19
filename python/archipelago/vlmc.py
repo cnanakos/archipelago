@@ -76,7 +76,7 @@ def showmapped(**kwargs):
     return len(mapped)
 
 
-def is_mapped(volume):
+def is_volume_mapped(volume):
     mapped = get_mapped()
     if not mapped:
         return None
@@ -189,7 +189,7 @@ def list_volumes(**kwargs):
 
 
 def remove(name, **kwargs):
-    device = is_mapped(name)
+    device = is_volume_mapped(name)
     if device is not None:
         raise Error("Volume %s mapped on device %s%s" % (name, DEVICE_PREFIX,
                     device))
@@ -212,7 +212,7 @@ def map_volume(name, **kwargs):
     if not loaded_module("blktap"):
         raise Error("blktap module not loaded")
 
-    device = is_mapped(name)
+    device = is_volume_mapped(name)
     if device is not None:
         raise Error("Volume %s already mapped on device %s%s" % (name,
                     '/dev/xen/blktap-2/tapdev', device))
