@@ -394,7 +394,7 @@ def mapinfo(name, verbose=False, **kwargs):
         print "Actual disk usage: " + str(nr_exists * BLOCKSIZE),
         print '(' + str(nr_exists) + '/' + str(blocks) + ' blocks)'
 
-    elif STORAGE == "files":
+    elif config['STORAGE'] == "files":
         raise Error("Mapinfo for file storage not supported")
     else:
         raise Error("Invalid storage")
