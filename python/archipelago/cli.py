@@ -40,7 +40,7 @@ import sys
 import argparse
 from common import (
     loadrc,
-    red,
+    ctext,
     Error,
 )
 
@@ -225,5 +225,5 @@ def main():
         args.func(cli=True, **kwargs)
         return 0
     except Error as e:
-        print red(e)
+        print ctext(e, 'red')
         return -1

@@ -41,9 +41,7 @@ import time
 from common import (
     FIRST_COLUMN_WIDTH,
     SECOND_COLUMN_WIDTH,
-    red,
-    green,
-    yellow,
+    ctext,
     get_segment,
     pretty_print,
     loaded_module,
@@ -67,13 +65,13 @@ def start_peer(peer, cli=False):
         peer.start()
     except Error as e:
         if cli:
-            sys.stdout.write(red("FAILED".ljust(SECOND_COLUMN_WIDTH)))
+            sys.stdout.write(ctext("FAILED".ljust(SECOND_COLUMN_WIDTH), 'red'))
             sys.stdout.write("\n")
         raise e
     except Exception as e:
         if cli:
             print e
-            sys.stdout.write(red("FAILED".ljust(SECOND_COLUMN_WIDTH)))
+            sys.stdout.write(ctext("FAILED".ljust(SECOND_COLUMN_WIDTH), 'red'))
             sys.stdout.write("\n")
         raise Error("Cannot start %s" % peer.role)
 
@@ -84,12 +82,13 @@ def start_peer(peer, cli=False):
         i += 1
         if i > 30:  # 3secs
             if cli:
-                sys.stdout.write(red("FAILED".ljust(SECOND_COLUMN_WIDTH)))
+                sys.stdout.write(ctext("FAILED".ljust(SECOND_COLUMN_WIDTH),
+                                       'red'))
                 sys.stdout.write("\n")
             raise Error("Couldn't start %s" % peer.role)
 
     if cli:
-        sys.stdout.write(green("OK".ljust(SECOND_COLUMN_WIDTH)))
+        sys.stdout.write(ctext("OK".ljust(SECOND_COLUMN_WIDTH), 'green'))
         sys.stdout.write("\n")
 
 
@@ -98,7 +97,7 @@ def stop_peer(peer, cli=False):
         peer.stop()
     except Error:
         if cli:
-            pretty_print(peer.role, yellow("Not running"))
+            pretty_print(peer.role, ctext("Not running", 'yellow'))
         return
     if cli:
         s = "Stopping %s " % peer.role
@@ -110,11 +109,12 @@ def stop_peer(peer, cli=False):
         i += 1
         if i > 150:
             if cli:
-                sys.stdout.write(red("FAILED".ljust(SECOND_COLUMN_WIDTH)))
+                sys.stdout.write(ctext("FAILED".ljust(SECOND_COLUMN_WIDTH),
+                                       'red'))
                 sys.stdout.write("\n")
             raise Error("Failed to stop peer %s." % peer.role)
     if cli:
-        sys.stdout.write(green("OK".ljust(SECOND_COLUMN_WIDTH)))
+        sys.stdout.write(ctext("OK".ljust(SECOND_COLUMN_WIDTH), 'green'))
         sys.stdout.write("\n")
 
 
@@ -122,16 +122,16 @@ def peer_running(peer, cli):
     try:
         if peer.is_running():
             if cli:
-                pretty_print(peer.role, green('running'))
+                pretty_print(peer.role, ctext('running', 'green'))
             return True
         else:
             if cli:
-                pretty_print(peer.role, red('not running'))
+                pretty_print(peer.role, ctext('not running', 'red'))
             return False
     except Error:
         if cli:
-            pretty_print(peer.role, yellow("Has valid pidfile but does not "
-                                           "seem to be active"))
+            pretty_print(peer.role, ctext("Has valid pidfile but does not "
+                                          "seem to be active", 'yellow'))
         return False
 
 
@@ -180,7 +180,7 @@ def start(user=False, role=None, cli=False, **kwargs):
         load_module("blktap", None)
     except Exception as e:
         if cli:
-            print red(e)
+            print ctext(e, 'red')
         stop(user, role, cli)
 
 
@@ -231,7 +231,7 @@ def status(cli=False, **kwargs):
             if peer_running(p, cli):
                 r += 1
         if cli:
-            pretty_print("blktap", red('Not loaded'))
+            pretty_print("blktap", ctext('Not loaded', 'red'))
         return r
 
     if cli:
@@ -243,11 +243,11 @@ def status(cli=False, **kwargs):
             r += 1
     if loaded_module("blktap"):
         if cli:
-            pretty_print("blktap", green('Loaded'))
+            pretty_print("blktap", ctext('Loaded', 'green'))
         #r += 1
     else:
         if cli:
-            pretty_print("blktap", red('Not loaded'))
+            pretty_print("blktap", ctext('Not loaded', 'red'))
     for role, _ in reversed(config['roles']):
         p = peers[role]
         if peer_running(p, cli):

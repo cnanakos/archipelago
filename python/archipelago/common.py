@@ -100,6 +100,25 @@ RADOS_BLOCKER = 'archip-radosd'
 MAPPER = 'archip-mapperd'
 VLMC = 'archip-vlmcd'
 
+FIRST_COLUMN_WIDTH = 23
+SECOND_COLUMN_WIDTH = 23
+
+
+def ctext(text, color=None):
+    COLORS = dict(
+        list(zip([
+            'grey', 'red',
+            'green', 'yellow',
+            'blue', 'magenta',
+            'cyan', 'white'],
+            list(range(30, 38))
+        )))
+    fmt = '\033[%dm%s'
+    if color is not None:
+        text = fmt % (COLORS[color], text)
+    text += '\033[0m'
+    return text
+
 
 def is_power2(x):
     return bool(x != 0 and (x & (x-1)) == 0)
@@ -499,21 +518,6 @@ config = {
     #RESERVED 1023
 }
 
-FIRST_COLUMN_WIDTH = 23
-SECOND_COLUMN_WIDTH = 23
-
-
-def green(s):
-    return '\x1b[32m' + str(s) + '\x1b[0m'
-
-
-def red(s):
-    return '\x1b[31m' + str(s) + '\x1b[0m'
-
-
-def yellow(s):
-    return '\x1b[33m' + str(s) + '\x1b[0m'
-
 
 def pretty_print(cid, status):
     sys.stdout.write(cid.ljust(FIRST_COLUMN_WIDTH))
@@ -847,13 +851,15 @@ def load_module(name, args):
     sys.stdout.write(s.ljust(FIRST_COLUMN_WIDTH))
     modules = loaded_modules()
     if name in modules:
-        sys.stdout.write(yellow("Already loaded".ljust(SECOND_COLUMN_WIDTH)))
+        sys.stdout.write(ctext("Already loaded".ljust(SECOND_COLUMN_WIDTH),
+                               'yellow'))
         sys.stdout.write("\n")
         return
     cmd = ["modprobe", "%s" % name]
     modules = loaded_modules()
     if name in modules:
-        sys.stdout.write(yellow("Already loaded".ljust(SECOND_COLUMN_WIDTH)))
+        sys.stdout.write(ctext("Already loaded".ljust(SECOND_COLUMN_WIDTH),
+                               'yellow'))
         sys.stdout.write("\n")
         return
     cmd = ["modprobe", "%s" % name]
@@ -863,10 +869,10 @@ def load_module(name, args):
     try:
         check_call(cmd, shell=False)
     except Exception:
-        sys.stdout.write(red("FAILED".ljust(SECOND_COLUMN_WIDTH)))
+        sys.stdout.write(ctext("FAILED".ljust(SECOND_COLUMN_WIDTH), 'red'))
         sys.stdout.write("\n")
         raise Error("Cannot load module %s. Check system logs" % name)
-    sys.stdout.write(green("OK".ljust(SECOND_COLUMN_WIDTH)))
+    sys.stdout.write(ctext("OK".ljust(SECOND_COLUMN_WIDTH), 'green'))
     sys.stdout.write("\n")
 
 
@@ -875,17 +881,18 @@ def unload_module(name):
     sys.stdout.write(s.ljust(FIRST_COLUMN_WIDTH))
     modules = loaded_modules()
     if name not in modules:
-        sys.stdout.write(yellow("Not loaded".ljust(SECOND_COLUMN_WIDTH)))
+        sys.stdout.write(ctext("Not loaded".ljust(SECOND_COLUMN_WIDTH),
+                               'yellow'))
         sys.stdout.write("\n")
         return
     cmd = ["modprobe -r %s" % name]
     try:
         check_call(cmd, shell=True)
     except Exception:
-        sys.stdout.write(red("FAILED".ljust(SECOND_COLUMN_WIDTH)))
+        sys.stdout.write(ctext("FAILED".ljust(SECOND_COLUMN_WIDTH), 'red'))
         sys.stdout.write("\n")
         raise Error("Cannot unload module %s. Check system logs" % name)
-    sys.stdout.write(green("OK".ljust(SECOND_COLUMN_WIDTH)))
+    sys.stdout.write(ctext("OK".ljust(SECOND_COLUMN_WIDTH), 'green'))
     sys.stdout.write("\n")
 
 xseg_initialized = False
