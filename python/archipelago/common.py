@@ -53,7 +53,6 @@ from ctypes import (
     c_char,
     Structure
 )
-import ctypes
 cb_null_ptrtype = CFUNCTYPE(None, uint32_t)
 
 import os
@@ -63,7 +62,6 @@ import psutil
 import errno
 import signal
 from subprocess import check_call
-from collections import namedtuple
 import socket
 import random
 from select import select
@@ -441,11 +439,11 @@ class Mapperd(Peer):
     def __init__(self, blockerm_port=None, blockerb_port=None, **kwargs):
         self.executable = MAPPER
         if blockerm_port is None:
-            raise Error("blockerm_port must be provied for %s" % role)
+            raise Error("blockerm_port must be provided for %s" % role)
         self.blockerm_port = blockerm_port
 
         if blockerb_port is None:
-            raise Error("blockerb_port must be provied for %s" % role)
+            raise Error("blockerb_port must be provided for %s" % role)
         self.blockerb_port = blockerb_port
         super(Mapperd, self).__init__(**kwargs)
 
@@ -466,11 +464,11 @@ class Vlmcd(Peer):
     def __init__(self, blocker_port=None, mapper_port=None, **kwargs):
         self.executable = VLMC
         if blocker_port is None:
-            raise Error("blocker_port must be provied for %s" % role)
+            raise Error("blocker_port must be provided for %s" % role)
         self.blocker_port = blocker_port
 
         if mapper_port is None:
-            raise Error("mapper_port must be provied for %s" % role)
+            raise Error("mapper_port must be provided for %s" % role)
         self.mapper_port = mapper_port
         super(Vlmcd, self).__init__(**kwargs)
 
@@ -535,7 +533,7 @@ class Error(Exception):
 class Segment(object):
     type = 'posix'
     name = 'archipelago'
-    dyports = 1024
+    dynports = 1024
     ports = 2048
     size = 5120
     alignment = 12
@@ -554,7 +552,7 @@ class Segment(object):
         if self.type not in valid_segment_types:
             raise Error("Segment type not valid")
         if self.alignment != 12:
-            raise Error("Wrong alignemt")
+            raise Error("Wrong alignment")
         if self.dynports >= self.ports:
             raise Error("Dynports >= max ports")
 
