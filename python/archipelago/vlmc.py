@@ -39,7 +39,11 @@ import os
 import sys
 from struct import unpack
 from binascii import hexlify
-from ctypes import c_uint32, c_uint64
+from ctypes import (
+    c_uint32,
+    c_uint64,
+    string_at,
+)
 
 from .common import *
 from blktap import (
@@ -163,7 +167,7 @@ def hash(name, cli=False, **kwargs):
     ret = req.success()
     if ret:
         xhash = req.get_data(xseg_reply_hash).contents
-        hash_name = ctypes.string_at(xhash.target, xhash.targetlen)
+        hash_name = string_at(xhash.target, xhash.targetlen)
     req.put()
     xseg_ctx.shutdown()
 
