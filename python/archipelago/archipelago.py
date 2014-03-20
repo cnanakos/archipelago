@@ -42,13 +42,13 @@ from common import (
     FIRST_COLUMN_WIDTH,
     SECOND_COLUMN_WIDTH,
     ctext,
-    get_segment,
     pretty_print,
     loaded_module,
     load_module,
     config,
     peers,
     Error,
+    XsegSegment
 )
 from vlmc import showmapped as vlmc_showmapped
 from vlmc import get_mapped as vlmc_get_mapped
@@ -148,6 +148,7 @@ def stop_peers(peers, cli=False):
 
 
 def start(user=False, role=None, cli=False, **kwargs):
+    xseg_segment = XsegSegment(kwargs.get('config'))
     if role:
         try:
             p = peers[role]
@@ -156,7 +157,7 @@ def start(user=False, role=None, cli=False, **kwargs):
         return start_peer(p, cli)
 
     if user:
-        #get_segment().create()
+        #xseg_segment.create()
         start_peers(peers, cli)
         mapped = vlmc_get_mapped()
         if mapped:
@@ -174,7 +175,7 @@ def start(user=False, role=None, cli=False, **kwargs):
         print "===================="
         print ""
     try:
-        #get_segment().create()
+        #xseg_segment.create()
         #time.sleep(0.5)
         start_peers(peers, cli)
         load_module("blktap", None)
@@ -185,6 +186,7 @@ def start(user=False, role=None, cli=False, **kwargs):
 
 
 def stop(user=False, role=None, cli=False, **kwargs):
+    xseg_segment = XsegSegment(kwargs.get('config'))
     if role:
         try:
             p = peers[role]
@@ -198,7 +200,7 @@ def stop(user=False, role=None, cli=False, **kwargs):
                 if not VlmcTapdisk.is_paused(m.device):
                     VlmcTapdisk.pause(m.device)
         stop_peers(peers, cli)
-        return get_segment().destroy()
+        return xseg_segment.destroy()
     #check devices
     if cli:
         print "===================="
@@ -208,7 +210,7 @@ def stop(user=False, role=None, cli=False, **kwargs):
     if not loaded_module("blktap"):
         stop_peers(peers, cli)
         time.sleep(0.5)
-        get_segment().destroy()
+        xseg_segment.destroy()
         return
 
     if cli:
@@ -220,11 +222,12 @@ def stop(user=False, role=None, cli=False, **kwargs):
             raise Error("Cannot stop archipelago. Mapped volumes exist")
     stop_peers(peers, cli)
     time.sleep(0.5)
-    get_segment().destroy()
+    xseg_segment.destroy()
 
 
 def status(cli=False, **kwargs):
     r = 0
+    xseg_segment = XsegSegment(kwargs.get('config'))
     if not loaded_module("blktap"):
         for role, _ in reversed(config['roles']):
             p = peers[role]

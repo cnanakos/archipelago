@@ -39,7 +39,6 @@ import os
 import sys
 import argparse
 from common import (
-    loadrc,
     ctext,
     Error,
 )
@@ -218,7 +217,6 @@ def main():
 
     try:
         args = parser.parse_args()
-        loadrc(args.config)
         kwargs = vars(args)
         # if parser_func == archipelago_parser:
             # peers = construct_peers()

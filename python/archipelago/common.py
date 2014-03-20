@@ -77,7 +77,6 @@ valid_role_types = ['file_blocker', 'rados_blocker', 'mapperd', 'vlmcd']
 valid_segment_types = ['posix']
 
 peers = dict()
-segment = None
 
 BIN_DIR = '/usr/bin/'
 DEFAULTS = '/etc/archipelago/archipelago.conf'
@@ -603,7 +602,7 @@ class Segment(object):
         return ctx
 
 
-def check_conf():
+def check_conf(segment):
     port_ranges = []
 
     def isExec(file_path):
@@ -634,17 +633,6 @@ def check_conf():
         port_ranges.append((portno_start, portno_end))
 
         port_ranges.append((portno_start, portno_end))
-
-    xseg_type = config['SEGMENT_TYPE']
-    xseg_name = config['SEGMENT_NAME']
-    xseg_dynports = config['SEGMENT_DYNPORTS']
-    xseg_ports = config['SEGMENT_PORTS']
-    xseg_size = config['SEGMENT_SIZE']
-    xseg_align = config['SEGMENT_ALIGNMENT']
-
-    global segment
-    segment = Segment(xseg_type, xseg_name, xseg_dynports, xseg_ports,
-                      xseg_size, xseg_align)
 
     try:
         if not config['roles']:
@@ -687,15 +675,30 @@ def check_conf():
         else:
             raise Error("No valid peer type: %s" % role_type)
         validatePortRange(peers[role].portno_start, peers[role].portno_end,
-                          xseg_ports)
+                          config['SEGMENT_PORTS'])
 
-    validatePortRange(config['VTOOL_START'], config['VTOOL_END'], xseg_ports)
+    validatePortRange(config['VTOOL_START'], config['VTOOL_END'],
+                      config['SEGMENT_PORTS'])
 
     return True
 
 
-def get_segment():
-    return segment
+class XsegSegment(Segment):
+    def __init__(self, arg=None):
+        loadrc(arg)
+
+        xseg_type = config['SEGMENT_TYPE']
+        xseg_name = config['SEGMENT_NAME']
+        xseg_dynports = config['SEGMENT_DYNPORTS']
+        xseg_ports = config['SEGMENT_PORTS']
+        xseg_size = config['SEGMENT_SIZE']
+        xseg_align = config['SEGMENT_ALIGNMENT']
+
+        super(XsegSegment, self).__init__(xseg_type, xseg_name, xseg_dynports,
+                                          xseg_ports, xseg_size, xseg_align)
+
+        if not check_conf(self):
+            raise Error("Invalid conf file")
 
 
 def construct_peers():
@@ -832,9 +835,6 @@ def loadrc(rc):
     config['roles'] = [(r, str(cfg.get(r, 'type'))) for r in roles]
     for r in roles:
         config[r] = createDict(cfg, r)
-
-    if not check_conf():
-        raise Error("Invalid conf file")
 
 
 def loaded_modules():
