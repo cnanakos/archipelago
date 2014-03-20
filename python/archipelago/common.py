@@ -113,10 +113,11 @@ def ctext(text, color=None):
             'cyan', 'white'],
             list(range(30, 38))
         )))
-    fmt = '\033[%dm%s'
-    if color is not None:
-        text = fmt % (COLORS[color], text)
-    text += '\033[0m'
+    if os.getenv('ANSI_COLORS_DISABLED') is None:
+        fmt = '\033[%dm%s'
+        if color is not None:
+            text = fmt % (COLORS[color], text)
+        text += '\033[0m'
     return text
 
 
