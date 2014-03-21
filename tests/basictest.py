@@ -32,10 +32,11 @@
 # or implied, of GRNET S.A.
 
 from archipelago.common import (
-    loadrc,
+    ArchipelagoConfig,
+    ArchipelagoPeers,
+    XsegSegment,
     DEVICE_PREFIX,
     Error,
-    construct_peers
 )
 import archipelago.vlmc as vlmc
 import archipelago.archipelago as archipelago
@@ -162,8 +163,11 @@ def snapshot(volume):
     vlmc.snapshot(name=volume)
 
 if __name__ == '__main__':
-    loadrc(None)
-    peers = construct_peers()
+    config = ArchipelagoConfig().get_config()
+    xseg_segment = XsegSegment(config)
+    archip_peers = ArchipelagoPeers(config)
+    archip_peers.construct_peers(xseg_segment)
+    peers = archip_peers.get_peers()
     tmpvolume = gettempname()
     mntdir = '/mnt/mountpoint'
     RANDOMSIZE = 20 * 1024 * 1024
