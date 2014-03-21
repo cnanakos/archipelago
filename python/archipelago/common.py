@@ -76,8 +76,6 @@ hostname = socket.gethostname()
 valid_role_types = ['file_blocker', 'rados_blocker', 'mapperd', 'vlmcd']
 valid_segment_types = ['posix']
 
-peers = dict()
-
 BIN_DIR = '/usr/bin/'
 DEFAULTS = '/etc/archipelago/archipelago.conf'
 
@@ -504,21 +502,6 @@ class Vlmcd(Peer):
             self.cli_opts.append(str(self.mapper_port))
 
 
-config = {
-    'CEPH_CONF_FILE': '/etc/ceph/ceph.conf',
-    # 'SPEC': "posix:archipelago:1024:5120:12",
-    'SEGMENT_TYPE': 'posix',
-    'SEGMENT_NAME': 'archipelago',
-    'SEGMENT_DYNPORTS': 1024,
-    'SEGMENT_PORTS': 2048,
-    'SEGMENT_SIZE': 5120,
-    'SEGMENT_ALIGNMENT': 12,
-    'VTOOL_START': 1003,
-    'VTOOL_END': 1003,
-    #RESERVED 1023
-}
-
-
 def pretty_print(cid, status):
     sys.stdout.write(cid.ljust(FIRST_COLUMN_WIDTH))
     sys.stdout.write(status.ljust(SECOND_COLUMN_WIDTH))
@@ -602,107 +585,81 @@ class Segment(object):
         return ctx
 
 
-def check_conf(segment):
-    port_ranges = []
+class ArchipelagoPeers(object):
+    def __init__(self, config):
+        self.port_ranges = []
+        self.config = config
+        self.peers = dict()
 
-    def isExec(file_path):
-        return os.path.isfile(file_path) and os.access(file_path, os.X_OK)
-
-    def validExec(program):
-        for path in os.environ["PATH"].split(os.pathsep):
-            exe_file = os.path.join(path, program)
-            if isExec(exe_file):
-                return True
-        return False
-
-    def validatePort(portno, limit):
+    def validatePort(self, portno, limit):
         if portno >= limit:
             raise Error("Portno %d out of range" % portno)
 
-    def validatePortRange(portno_start, portno_end, limit):
-        validatePort(portno_start, limit)
-        validatePort(portno_end, limit)
+    def validatePortRange(self, portno_start, portno_end, limit):
+        self.validatePort(portno_start, limit)
+        self.validatePort(portno_end, limit)
         if portno_start > portno_end:
             raise Error("Portno_start > Portno_end: %d > %d " %
                         (portno_start, portno_end))
-        for start, end in port_ranges:
+        for start, end in self.port_ranges:
             if not (portno_end < start or portno_start > end):
                 raise Error(
                     "Port range conflict: (%d, %d) conflicts with (%d, %d)" %
                     (portno_start, portno_end,  start, end))
-        port_ranges.append((portno_start, portno_end))
+        self.port_ranges.append((portno_start, portno_end))
 
-        port_ranges.append((portno_start, portno_end))
+        self.port_ranges.append((portno_start, portno_end))
 
-    try:
-        if not config['roles']:
-            raise Error("Roles setup must be provided")
-    except KeyError:
-        raise Error("Roles setup must be provided")
+    def get_peers(self):
+        return self.peers
 
-    try:
-        getpwnam(config['USER'])
-    except KeyError:
-        raise Error("User '%s' does not exist." % config['USER'])
+    def construct_peers(self, segment):
+        for role, role_type in self.config['roles']:
+            if role_type not in valid_role_types:
+                raise Error("%s is not a valid role" % role_type)
+            try:
+                role_config = self.config[role]
+                role_config['user'] = self.config['USER']
+                role_config['group'] = self.config['GROUP']
+            except:
+                raise Error("No config found for %s" % role)
 
-    try:
-        getgrnam(config['GROUP'])
-    except KeyError:
-        raise Error("Group '%s' does not exist." % config['GROUP'])
+            if role_type == 'file_blocker':
+                self.peers[role] = Filed(role=role, spec=segment.get_spec(),
+                                         prefix=ARCHIP_PREFIX, **role_config)
+            elif role_type == 'rados_blocker':
+                self.peers[role] = Radosd(role=role, spec=segment.get_spec(),
+                                          **role_config)
+            elif role_type == 'mapperd':
+                self.peers[role] = Mapperd(role=role, spec=segment.get_spec(),
+                                           **role_config)
+            elif role_type == 'vlmcd':
+                self.peers[role] = Vlmcd(role=role, spec=segment.get_spec(),
+                                         **role_config)
+            else:
+                raise Error("No valid peer type: %s" % role_type)
 
-    for role, role_type in config['roles']:
-        if role_type not in valid_role_types:
-            raise Error("%s is not a valid role" % role_type)
-        try:
-            role_config = config[role]
-            role_config['user'] = config['USER']
-            role_config['group'] = config['GROUP']
-        except:
-            raise Error("No config found for %s" % role)
-
-        if role_type == 'file_blocker':
-            peers[role] = Filed(role=role, spec=segment.get_spec(),
-                                prefix=ARCHIP_PREFIX, **role_config)
-        elif role_type == 'rados_blocker':
-            peers[role] = Radosd(role=role, spec=segment.get_spec(),
-                                 **role_config)
-        elif role_type == 'mapperd':
-            peers[role] = Mapperd(role=role, spec=segment.get_spec(),
-                                  **role_config)
-        elif role_type == 'vlmcd':
-            peers[role] = Vlmcd(role=role, spec=segment.get_spec(),
-                                **role_config)
-        else:
-            raise Error("No valid peer type: %s" % role_type)
-        validatePortRange(peers[role].portno_start, peers[role].portno_end,
-                          config['SEGMENT_PORTS'])
-
-    validatePortRange(config['VTOOL_START'], config['VTOOL_END'],
-                      config['SEGMENT_PORTS'])
-
-    return True
+            self.validatePortRange(self.peers[role].portno_start,
+                                   self.peers[role].portno_end,
+                                   self.config['SEGMENT_PORTS'])
+        self.validatePortRange(self.config['VTOOL_START'],
+                               self.config['VTOOL_END'],
+                               self.config['SEGMENT_PORTS'])
 
 
 class XsegSegment(Segment):
-    def __init__(self, arg=None):
-        loadrc(arg)
+    def __init__(self, config):
+        self.config = config
 
-        xseg_type = config['SEGMENT_TYPE']
-        xseg_name = config['SEGMENT_NAME']
-        xseg_dynports = config['SEGMENT_DYNPORTS']
-        xseg_ports = config['SEGMENT_PORTS']
-        xseg_size = config['SEGMENT_SIZE']
-        xseg_align = config['SEGMENT_ALIGNMENT']
+        xseg_type = self.config['SEGMENT_TYPE']
+        xseg_name = self.config['SEGMENT_NAME']
+        xseg_dynports = self.config['SEGMENT_DYNPORTS']
+        xseg_ports = self.config['SEGMENT_PORTS']
+        xseg_size = self.config['SEGMENT_SIZE']
+        xseg_align = self.config['SEGMENT_ALIGNMENT']
 
         super(XsegSegment, self).__init__(xseg_type, xseg_name, xseg_dynports,
                                           xseg_ports, xseg_size, xseg_align)
-
-        if not check_conf(self):
-            raise Error("Invalid conf file")
-
-
-def construct_peers():
-    return peers
 
 
 vtool_port = None
@@ -810,31 +767,65 @@ def createDict(cfg, section):
     return sec_dic
 
 
-def loadrc(rc):
-    try:
-        if rc is None:
-            cfg_dir = os.path.expanduser(DEFAULTS)
-        else:
-            cfg_dir = rc
-        cfg_fd = open(cfg_dir)
-    except:
-        raise Error("Cannot read config file")
+class ArchipelagoConfig(object):
+    def __init__(self, rc=None):
+        try:
+            if rc is None:
+                cfg_dir = os.path.expanduser(DEFAULTS)
+            else:
+                cfg_dir = rc
+            self.cfg_fd = open(cfg_dir)
+        except:
+            raise Error("Cannot read config file")
 
-    cfg = ConfigParser.ConfigParser()
-    cfg.readfp(cfg_fd)
-    config['SEGMENT_PORTS'] = cfg.getint('XSEG', 'SEGMENT_PORTS')
-    config['SEGMENT_DYNPORTS'] = cfg.getint('XSEG', 'SEGMENT_DYNPORTS')
-    config['SEGMENT_SIZE'] = cfg.getint('XSEG', 'SEGMENT_SIZE')
-    config['USER'] = cfg.get('ARCHIPELAGO', 'USER')
-    config['GROUP'] = cfg.get('ARCHIPELAGO', 'GROUP')
-    config['VTOOL_START'] = cfg.getint('XSEG', 'VTOOL_START')
-    config['VTOOL_END'] = cfg.getint('XSEG', 'VTOOL_END')
-    roles = cfg.get('PEERS', 'ROLES')
-    roles = str(roles)
-    roles = roles.split(' ')
-    config['roles'] = [(r, str(cfg.get(r, 'type'))) for r in roles]
-    for r in roles:
-        config[r] = createDict(cfg, r)
+        self.config = {
+            'CEPH_CONF_FILE': cfg_dir,
+            # 'SPEC': "posix:archipelago:1024:5120:12",
+            'SEGMENT_TYPE': 'posix',
+            'SEGMENT_NAME': 'archipelago',
+            'SEGMENT_DYNPORTS': 1024,
+            'SEGMENT_PORTS': 2048,
+            'SEGMENT_SIZE': 5120,
+            'SEGMENT_ALIGNMENT': 12,
+            'VTOOL_START': 1003,
+            'VTOOL_END': 1003,
+            #RESERVED 1023
+        }
+
+    def get_config(self):
+        cfg = ConfigParser.ConfigParser()
+        cfg.readfp(self.cfg_fd)
+        self.config['SEGMENT_PORTS'] = cfg.getint('XSEG', 'SEGMENT_PORTS')
+        self.config['SEGMENT_DYNPORTS'] = cfg.getint('XSEG',
+                                                     'SEGMENT_DYNPORTS')
+        self.config['SEGMENT_SIZE'] = cfg.getint('XSEG', 'SEGMENT_SIZE')
+        self.config['USER'] = cfg.get('ARCHIPELAGO', 'USER')
+        self.config['GROUP'] = cfg.get('ARCHIPELAGO', 'GROUP')
+        self.config['VTOOL_START'] = cfg.getint('XSEG', 'VTOOL_START')
+        self.config['VTOOL_END'] = cfg.getint('XSEG', 'VTOOL_END')
+        roles = cfg.get('PEERS', 'ROLES')
+        roles = str(roles)
+        roles = roles.split(' ')
+        self.config['roles'] = [(r, str(cfg.get(r, 'type'))) for r in roles]
+        for r in roles:
+            self.config[r] = createDict(cfg, r)
+        try:
+            if not self.config['roles']:
+                raise Error("Roles setup must be provided")
+        except KeyError:
+            raise Error("Roles setup must be provided")
+
+        try:
+            getpwnam(self.config['USER'])
+        except KeyError:
+            raise Error("User '%s' does not exist." % self.config['USER'])
+
+        try:
+            getgrnam(self.config['GROUP'])
+        except KeyError:
+            raise Error("Group '%s' does not exist." % self.config['GROUP'])
+
+        return self.config
 
 
 def loaded_modules():

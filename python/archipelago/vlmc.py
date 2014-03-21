@@ -45,7 +45,21 @@ from ctypes import (
     string_at,
 )
 
-from .common import *
+from common import (
+    Request,
+    XsegSegment,
+    Xseg_ctx,
+    ArchipelagoConfig,
+    ArchipelagoPeers,
+    Error,
+    exclusive,
+    loaded_module,
+    xseg_reply_hash,
+    xseg_reply_info,
+    ARCHIP_PREFIX,
+    DEVICE_PREFIX,
+)
+
 from blktap import (
     VlmcTapdisk,
     TapdiskState,
@@ -120,7 +134,11 @@ def create(name, size=None, snap=None, cont_addr=False, **kwargs):
         size = size << 20
 
     ret = False
-    xseg_segment = XsegSegment(kwargs.get('config'))
+    config = ArchipelagoConfig(kwargs.get('config')).get_config()
+    xseg_segment = XsegSegment(config)
+    archip_peers = ArchipelagoPeers(config)
+    archip_peers.construct_peers(xseg_segment)
+    peers = archip_peers.get_peers()
     xseg_ctx = Xseg_ctx(xseg_segment)
     mport = peers['mapperd'].portno_start
     req = Request.get_clone_request(xseg_ctx, mport, snap, clone=name,
@@ -138,7 +156,11 @@ def snapshot(name, snap_name=None, cli=False, **kwargs):
     if len(name) < 6:
         raise Error("Name should have at least len 6")
 
-    xseg_segment = XsegSegment(kwargs.get('config'))
+    config = ArchipelagoConfig(kwargs.get('config')).get_config()
+    xseg_segment = XsegSegment(config)
+    archip_peers = ArchipelagoPeers(config)
+    archip_peers.construct_peers(xseg_segment)
+    peers = archip_peers.get_peers()
     xseg_ctx = Xseg_ctx(xseg_segment)
     vport = peers['vlmcd'].portno_start
     req = Request.get_snapshot_request(xseg_ctx, vport, name, snap=snap_name)
@@ -158,7 +180,11 @@ def hash(name, cli=False, **kwargs):
     if len(name) < 6:
         raise Error("Name should have at least len 6")
 
-    xseg_segment = XsegSegment(kwargs.get('config'))
+    config = ArchipelagoConfig(kwargs.get('config')).get_config()
+    xseg_segment = XsegSegment(config)
+    archip_peers = ArchipelagoPeers(config)
+    archip_peers.construct_peers(xseg_segment)
+    peers = archip_peers.get_peers()
     xseg_ctx = Xseg_ctx(xseg_segment)
     mport = peers['mapperd'].portno_start
     req = Request.get_hash_request(xseg_ctx, mport, name)
@@ -178,23 +204,6 @@ def hash(name, cli=False, **kwargs):
         return hash_name
 
 
-def list_volumes(**kwargs):
-    if isinstance(peers['blockerm'], Sosd):
-        import rados
-        cluster = rados.Rados(conffile=config['CEPH_CONF_FILE'])
-        cluster.connect()
-        ioctx = cluster.open_ioctx(peers['blockerm'].pool)
-        oi = rados.ObjectIterator(ioctx)
-        for o in oi:
-            name = o.key
-            if name.startswith(ARCHIP_PREFIX) and not name.endswith('_lock'):
-                print name[len(ARCHIP_PREFIX):]
-    elif config['STORAGE'] == "files":
-        raise Error("Vlmc list not supported for files yet")
-    else:
-        raise Error("Invalid storage")
-
-
 def remove(name, **kwargs):
     device = is_volume_mapped(name)
     if device is not None:
@@ -202,7 +211,11 @@ def remove(name, **kwargs):
                     device))
 
     ret = False
-    xseg_segment = XsegSegment(kwargs.get('config'))
+    config = ArchipelagoConfig(kwargs.get('config')).get_config()
+    xseg_segment = XsegSegment(config)
+    archip_peers = ArchipelagoPeers(config)
+    archip_peers.construct_peers(xseg_segment)
+    peers = archip_peers.get_peers()
     xseg_ctx = Xseg_ctx(xseg_segment)
     mport = peers['mapperd'].portno_start
     req = Request.get_delete_request(xseg_ctx, mport, name)
@@ -268,7 +281,11 @@ def lock(name, cli=False, **kwargs):
 
     name = ARCHIP_PREFIX + name
 
-    xseg_segment = XsegSegment(kwargs.get('config'))
+    config = ArchipelagoConfig(kwargs.get('config')).get_config()
+    xseg_segment = XsegSegment(config)
+    archip_peers = ArchipelagoPeers(config)
+    archip_peers.construct_peers(xseg_segment)
+    peers = archip_peers.get_peers()
     xseg_ctx = Xseg_ctx(xseg_segment)
     mbport = peers['blockerm'].portno_start
     req = Request.get_acquire_request(xseg_ctx, mbport, name)
@@ -289,7 +306,11 @@ def unlock(name, force=False, cli=False, **kwargs):
 
     name = ARCHIP_PREFIX + name
 
-    xseg_segment = XsegSegment(kwargs.get('config'))
+    config = ArchipelagoConfig(kwargs.get('config')).get_config()
+    xseg_segment = XsegSegment(config)
+    archip_peers = ArchipelagoPeers(config)
+    archip_peers.construct_peers(xseg_segment)
+    peers = archip_peers.get_peers()
     xseg_ctx = Xseg_ctx(xseg_segment)
     mbport = peers['blockerm'].portno_start
     req = Request.get_release_request(xseg_ctx, mbport, name, force=force)
@@ -309,7 +330,11 @@ def open_volume(name, cli=False, **kwargs):
         raise Error("Name should have at least len 6")
 
     ret = False
-    xseg_segment = XsegSegment(kwargs.get('config'))
+    config = ArchipelagoConfig(kwargs.get('config')).get_config()
+    xseg_segment = XsegSegment(config)
+    archip_peers = ArchipelagoPeers(config)
+    archip_peers.construct_peers(xseg_segment)
+    peers = archip_peers.get_peers()
     xseg_ctx = Xseg_ctx(xseg_segment)
     vport = peers['vlmcd'].portno_start
     req = Request.get_open_request(xseg_ctx, vport, name)
@@ -329,7 +354,11 @@ def close_volume(name, cli=False, **kwargs):
         raise Error("Name should have at least len 6")
 
     ret = False
-    xseg_segment = XsegSegment(kwargs.get('config'))
+    config = ArchipelagoConfig(kwargs.get('config')).get_config()
+    xseg_segment = XsegSegment(config)
+    archip_peers = ArchipelagoPeers(config)
+    archip_peers.construct_peers(xseg_segment)
+    peers = archip_peers.get_peers()
     xseg_ctx = Xseg_ctx(xseg_segment)
     vport = peers['vlmcd'].portno_start
     req = Request.get_close_request(xseg_ctx, vport, name)
@@ -349,7 +378,11 @@ def info(name, cli=False, **kwargs):
         raise Error("Name should have at least len 6")
 
     ret = False
-    xseg_segment = XsegSegment(kwargs.get('config'))
+    config = ArchipelagoConfig(kwargs.get('config')).get_config()
+    xseg_segment = XsegSegment(config)
+    archip_peers = ArchipelagoPeers(config)
+    archip_peers.construct_peers(xseg_segment)
+    peers = archip_peers.get_peers()
     xseg_ctx = Xseg_ctx(xseg_segment)
     mport = peers['mapperd'].portno_start
     req = Request.get_info_request(xseg_ctx, mport, name)
@@ -366,48 +399,65 @@ def info(name, cli=False, **kwargs):
         sys.stdout.write("Volume %s: size: %d\n" % (name, size))
 
 
-def mapinfo(name, verbose=False, **kwargs):
-    if len(name) < 6:
-        raise Error("Name should have at least len 6")
+#def mapinfo(name, verbose=False, **kwargs):
+    #if len(name) < 6:
+        #raise Error("Name should have at least len 6")
 
-    if config['STORAGE'] == "rados":
-        import rados
-        cluster = rados.Rados(conffile=config['CEPH_CONF_FILE'])
-        cluster.connect()
-        ioctx = cluster.open_ioctx(config['RADOS_POOL_MAPS'])
-        BLOCKSIZE = 4 * 1024 * 1024
-        try:
-            mapdata = ioctx.read(ARCHIP_PREFIX + name, length=BLOCKSIZE)
-        except Exception:
-            raise Error("Cannot read map data")
-        if not mapdata:
-            raise Error("Cannot read map data")
-        pos = 0
-        size_uint32t = sizeof(c_uint32)
-        version = unpack("<L", mapdata[pos:pos + size_uint32t])[0]
-        pos += size_uint32t
-        size_uint64t = sizeof(c_uint64)
-        size = unpack("Q", mapdata[pos:pos + size_uint64t])[0]
-        pos += size_uint64t
-        blocks = size / BLOCKSIZE
-        nr_exists = 0
-        print ""
-        print "Volume: " + name
-        print "Version: " + str(version)
-        print "Size: " + str(size)
-        for i in range(blocks):
-            exists = bool(unpack("B", mapdata[pos:pos + 1])[0])
-            if exists:
-                nr_exists += 1
-            pos += 1
-            block = hexlify(mapdata[pos:pos + 32])
-            pos += 32
-            if verbose:
-                print block, exists
-        print "Actual disk usage: " + str(nr_exists * BLOCKSIZE),
-        print '(' + str(nr_exists) + '/' + str(blocks) + ' blocks)'
+    #if config['STORAGE'] == "rados":
+        #import rados
+        #cluster = rados.Rados(conffile=config['CEPH_CONF_FILE'])
+        #cluster.connect()
+        #ioctx = cluster.open_ioctx(config['RADOS_POOL_MAPS'])
+        #BLOCKSIZE = 4 * 1024 * 1024
+        #try:
+            #mapdata = ioctx.read(ARCHIP_PREFIX + name, length=BLOCKSIZE)
+        #except Exception:
+            #raise Error("Cannot read map data")
+        #if not mapdata:
+            #raise Error("Cannot read map data")
+        #pos = 0
+        #size_uint32t = sizeof(c_uint32)
+        #version = unpack("<L", mapdata[pos:pos + size_uint32t])[0]
+        #pos += size_uint32t
+        #size_uint64t = sizeof(c_uint64)
+        #size = unpack("Q", mapdata[pos:pos + size_uint64t])[0]
+        #pos += size_uint64t
+        #blocks = size / BLOCKSIZE
+        #nr_exists = 0
+        #print ""
+        #print "Volume: " + name
+        #print "Version: " + str(version)
+        #print "Size: " + str(size)
+        #for i in range(blocks):
+            #exists = bool(unpack("B", mapdata[pos:pos + 1])[0])
+            #if exists:
+                #nr_exists += 1
+            #pos += 1
+            #block = hexlify(mapdata[pos:pos + 32])
+            #pos += 32
+            #if verbose:
+                #print block, exists
+        #print "Actual disk usage: " + str(nr_exists * BLOCKSIZE),
+        #print '(' + str(nr_exists) + '/' + str(blocks) + ' blocks)'
 
-    elif config['STORAGE'] == "files":
-        raise Error("Mapinfo for file storage not supported")
-    else:
-        raise Error("Invalid storage")
+    #elif config['STORAGE'] == "files":
+        #raise Error("Mapinfo for file storage not supported")
+    #else:
+        #raise Error("Invalid storage")
+
+
+#def list_volumes(**kwargs):
+    #if isinstance(peers['blockerm'], Sosd):
+        #import rados
+        #cluster = rados.Rados(conffile=config['CEPH_CONF_FILE'])
+        #cluster.connect()
+        #ioctx = cluster.open_ioctx(peers['blockerm'].pool)
+        #oi = rados.ObjectIterator(ioctx)
+        #for o in oi:
+            #name = o.key
+            #if name.startswith(ARCHIP_PREFIX) and not name.endswith('_lock'):
+                #print name[len(ARCHIP_PREFIX):]
+    #elif config['STORAGE'] == "files":
+        #raise Error("Vlmc list not supported for files yet")
+    #else:
+        #raise Error("Invalid storage")

@@ -45,10 +45,10 @@ from common import (
     pretty_print,
     loaded_module,
     load_module,
-    config,
-    peers,
     Error,
-    XsegSegment
+    XsegSegment,
+    ArchipelagoConfig,
+    ArchipelagoPeers,
 )
 from vlmc import showmapped as vlmc_showmapped
 from vlmc import get_mapped as vlmc_get_mapped
@@ -135,20 +135,24 @@ def peer_running(peer, cli):
         return False
 
 
-def start_peers(peers, cli=False):
+def start_peers(peers, config, cli=False):
     for r, _ in config['roles']:
         p = peers[r]
         start_peer(p, cli)
 
 
-def stop_peers(peers, cli=False):
+def stop_peers(peers, config, cli=False):
     for r, _ in reversed(config['roles']):
         p = peers[r]
         stop_peer(p, cli)
 
 
 def start(user=False, role=None, cli=False, **kwargs):
-    xseg_segment = XsegSegment(kwargs.get('config'))
+    config = ArchipelagoConfig(kwargs.get('config')).get_config()
+    xseg_segment = XsegSegment(config)
+    archip_peers = ArchipelagoPeers(config)
+    archip_peers.construct_peers(xseg_segment)
+    peers = archip_peers.get_peers()
     if role:
         try:
             p = peers[role]
@@ -158,7 +162,7 @@ def start(user=False, role=None, cli=False, **kwargs):
 
     if user:
         #xseg_segment.create()
-        start_peers(peers, cli)
+        start_peers(peers, config, cli)
         mapped = vlmc_get_mapped()
         if mapped:
             for m in mapped:
@@ -177,7 +181,7 @@ def start(user=False, role=None, cli=False, **kwargs):
     try:
         #xseg_segment.create()
         #time.sleep(0.5)
-        start_peers(peers, cli)
+        start_peers(peers, config, cli)
         load_module("blktap", None)
     except Exception as e:
         if cli:
@@ -186,7 +190,11 @@ def start(user=False, role=None, cli=False, **kwargs):
 
 
 def stop(user=False, role=None, cli=False, **kwargs):
-    xseg_segment = XsegSegment(kwargs.get('config'))
+    config = ArchipelagoConfig(kwargs.get('config')).get_config()
+    xseg_segment = XsegSegment(config)
+    archip_peers = ArchipelagoPeers(config)
+    archip_peers.construct_peers(xseg_segment)
+    peers = archip_peers.get_peers()
     if role:
         try:
             p = peers[role]
@@ -199,7 +207,7 @@ def stop(user=False, role=None, cli=False, **kwargs):
             for m in mapped:
                 if not VlmcTapdisk.is_paused(m.device):
                     VlmcTapdisk.pause(m.device)
-        stop_peers(peers, cli)
+        stop_peers(peers, config, cli)
         return xseg_segment.destroy()
     #check devices
     if cli:
@@ -208,7 +216,7 @@ def stop(user=False, role=None, cli=False, **kwargs):
         print "===================="
         print ""
     if not loaded_module("blktap"):
-        stop_peers(peers, cli)
+        stop_peers(peers, config, cli)
         time.sleep(0.5)
         xseg_segment.destroy()
         return
@@ -220,14 +228,18 @@ def stop(user=False, role=None, cli=False, **kwargs):
         mapped = vlmc_get_mapped()
         if mapped and len(mapped) > 0:
             raise Error("Cannot stop archipelago. Mapped volumes exist")
-    stop_peers(peers, cli)
+    stop_peers(peers, config, cli)
     time.sleep(0.5)
     xseg_segment.destroy()
 
 
 def status(cli=False, **kwargs):
     r = 0
-    xseg_segment = XsegSegment(kwargs.get('config'))
+    config = ArchipelagoConfig(kwargs.get('config')).get_config()
+    xseg_segment = XsegSegment(config)
+    archip_peers = ArchipelagoPeers(config)
+    archip_peers.construct_peers(xseg_segment)
+    peers = archip_peers.get_peers()
     if not loaded_module("blktap"):
         for role, _ in reversed(config['roles']):
             p = peers[role]
