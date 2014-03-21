@@ -518,14 +518,6 @@ class Error(Exception):
 
 
 class Segment(object):
-    type = 'posix'
-    name = 'archipelago'
-    dynports = 1024
-    ports = 2048
-    size = 5120
-    alignment = 12
-
-    spec = None
 
     def __init__(self, type, name, dynports, ports, size, align=12):
         initialize_xseg()
@@ -535,6 +527,7 @@ class Segment(object):
         self.ports = ports
         self.size = size
         self.alignment = align
+        self.spec = None
 
         if self.type not in valid_segment_types:
             raise Error("Segment type not valid")
