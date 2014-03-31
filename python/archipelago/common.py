@@ -1180,8 +1180,11 @@ class Request(object):
                    datalen=datalen)
 
     @classmethod
-    def get_info_request(cls, xseg, dst, target):
-        return cls(xseg, dst, target, op=X_INFO)
+    def get_info_request(cls, xseg, dst, target, cont_addr=False):
+        flags = 0
+        if cont_addr:
+            flags |= XF_CONTADDR
+        return cls(xseg, dst, target, op=X_INFO, flags=flags)
 
     @classmethod
     def get_copy_request(cls, xseg, dst, target, copy_target=None, size=0,
@@ -1228,12 +1231,18 @@ class Request(object):
                    flags=flags)
 
     @classmethod
-    def get_open_request(cls, xseg, dst, target):
-        return cls(xseg, dst, target, op=X_OPEN)
+    def get_open_request(cls, xseg, dst, target, cont_addr=False):
+        flags = 0
+        if cont_addr:
+            flags |= XF_CONTADDR
+        return cls(xseg, dst, target, op=X_OPEN, flags=flags)
 
     @classmethod
-    def get_close_request(cls, xseg, dst, target):
-        return cls(xseg, dst, target, op=X_CLOSE)
+    def get_close_request(cls, xseg, dst, target, cont_addr=False):
+        flags = 0
+        if cont_addr:
+            flags |= XF_CONTADDR
+        return cls(xseg, dst, target, op=X_CLOSE, flags=flags)
 
     @classmethod
     def get_snapshot_request(cls, xseg, dst, target, snap=None):
