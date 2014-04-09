@@ -252,11 +252,6 @@ def pmap_volume(name, **kwargs):
     if not loaded_module("blktap"):
         raise Error("blktap module not loaded")
 
-    device = is_volume_mapped(name)
-    if device is not None:
-        raise Error("Volume %s already mapped on device %s%s" % (name,
-                    '/dev/xen/blktap-2/tapdev', device))
-
     try:
         device = VlmcTapdisk.pcreate(name)
         if device:
