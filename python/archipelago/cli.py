@@ -84,6 +84,10 @@ def vlmc_parser():
     map_parser.add_argument('-p', '--pool', type=str, nargs='?',
                             help='for backwards compatiblity with rbd')
 
+    pmap_parser = subparsers.add_parser('pmap', help='Map Pithos+ volume')
+    pmap_parser.add_argument('name', type=str,  help='Pithos+ mapfile name')
+    pmap_parser.set_defaults(func=vlmc.pmap_volume)
+
     unmap_parser = subparsers.add_parser('unmap', help='Unmap volume')
     unmap_parser.add_argument('name', type=str,  help='volume/device name')
     unmap_parser.set_defaults(func=vlmc.unmap_volume)

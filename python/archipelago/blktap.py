@@ -114,7 +114,7 @@ class VlmcTapdisk(object):
             tapdisk = VlmcTapdisk.Tapdisk()
 
             for pair in line.split():
-                key, value = pair.split('=')
+                key, value = pair.split('=', 1)
                 if key == 'pid':
                     tapdisk.pid = value
                 elif key == 'minor':
@@ -125,7 +125,7 @@ class VlmcTapdisk(object):
                 elif key == 'state':
                     tapdisk.state = value
                 elif key == 'args' and value.find(':') != -1:
-                    _, tapdisk.volume = value.split(':')
+                    _, tapdisk.volume = value.split(':', 1)
 
             tapdisks.append(tapdisk)
 
@@ -143,6 +143,10 @@ class VlmcTapdisk(object):
     @staticmethod
     def create(volume):
         return VlmcTapdisk.exc('create', '-a%s:%s' % ('archipelago', volume))
+
+    @staticmethod
+    def pcreate(volume):
+        return VlmcTapdisk.exc('create', '-a%s:%s' % ('pithos', volume))
 
     @staticmethod
     def destroy(device):
